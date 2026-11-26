@@ -26,9 +26,14 @@ jobs:
         run: make demo-scoped PYTHON=python
       - name: Verify scoped replay
         run: make replay-scoped PYTHON=python
+      - name: Run peer auction smoke experiment
+        run: make demo-auction PYTHON=python
+      - name: Verify peer auction replay
+        run: make replay-auction PYTHON=python
       - uses: actions/upload-artifact@v4
         with:
           name: coordination-smoke
           path: |
             artifacts/demo.json
             artifacts/scoped.json
+            artifacts/auction.json

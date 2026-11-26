@@ -17,3 +17,10 @@ demo-scoped:
 
 replay-scoped:
 	$(PYTHON) -m swarmforge.cli replay artifacts/scoped.json
+
+.PHONY: demo-auction replay-auction
+demo-auction:
+	$(PYTHON) -m swarmforge.cli run examples/two-robot-outage.json --algorithm local_auction --seed 42 --output artifacts/auction.json
+
+replay-auction:
+	$(PYTHON) -m swarmforge.cli replay artifacts/auction.json

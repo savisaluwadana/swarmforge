@@ -12,7 +12,7 @@ def main():
     sub=parser.add_subparsers(dest="cmd",required=True)
     run=sub.add_parser("run")
     run.add_argument("scenario",type=Path)
-    run.add_argument("--algorithm",choices=["centralized_greedy","scoped_lease"],default="centralized_greedy")
+    run.add_argument("--algorithm",choices=["centralized_greedy","local_auction","scoped_lease"],default="centralized_greedy")
     run.add_argument("--seed",type=int,default=0)
     run.add_argument("--engine-version",default=__version__)
     run.add_argument("--output",type=Path,required=True)
