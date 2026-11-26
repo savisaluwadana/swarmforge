@@ -8,12 +8,14 @@ permissions:
 jobs:
   core:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install benchmark validation dependencies
+        run: python -m pip install -r services/swarmforge/requirements-benchmark.txt
       - name: Compile
         run: python -m compileall -q services/swarmforge/src
       - name: Unit and randomized invariant tests
@@ -30,10 +32,14 @@ jobs:
         run: make demo-auction PYTHON=python
       - name: Verify peer auction replay
         run: make replay-auction PYTHON=python
+      - name: Run predeclared research matrix with replay and trace audit
+        run: make benchmark-research PYTHON=python
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: coordination-smoke
           path: |
             artifacts/demo.json
             artifacts/scoped.json
             artifacts/auction.json
+            artifacts/benchmark-research/

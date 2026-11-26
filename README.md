@@ -67,3 +67,6 @@ make demo-auction && make replay-auction
 make demo-scoped && make replay-scoped
 ```
 The CLI supports three scripted policies. The peer auction is a simplified baseline, and scoped renewal/reassignment are conservative. See docs/coordination.md and docs/progress.md. Web/API/MCP remain planned.
+
+## R2 research benchmark
+Install pinned validation dependencies: `python3 -m pip install -r services/swarmforge/requirements-benchmark.txt`. Run `make benchmark-smoke` (12 runs) or `make benchmark-research` (72 runs including the smoke subset). Each run validates the trace and replays the same manifest. Inspect summary.json, runs.csv, comparisons.csv and raw traces in the output directory. Failures retained; no statistical claim from small smoke fixtures.

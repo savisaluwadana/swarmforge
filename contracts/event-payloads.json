@@ -1,0 +1,753 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "run.started": {
+      "type": "object",
+      "properties": {
+        "manifest_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "engine_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "manifest_hash",
+        "engine_version"
+      ],
+      "additionalProperties": true
+    },
+    "run.progress": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "released": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_ticks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "completed",
+        "released",
+        "duration_ticks"
+      ],
+      "additionalProperties": true
+    },
+    "run.finished": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "trace_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "status",
+        "trace_hash"
+      ],
+      "additionalProperties": true
+    },
+    "run.invariant_failed": {
+      "type": "object",
+      "properties": {
+        "invariant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entity_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "invariant_id",
+        "reason",
+        "entity_ids"
+      ],
+      "additionalProperties": true
+    },
+    "robot.moved": {
+      "type": "object",
+      "properties": {
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "y": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        },
+        "to": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "y": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "robot_id",
+        "from",
+        "to"
+      ],
+      "additionalProperties": true
+    },
+    "robot.failed": {
+      "type": "object",
+      "properties": {
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "robot_id",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "robot.waiting": {
+      "type": "object",
+      "properties": {
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "robot_id",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "task.released": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": true
+    },
+    "task.assigned": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expires_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "robot_id",
+        "epoch",
+        "expires_tick",
+        "issuer_id"
+      ],
+      "additionalProperties": true
+    },
+    "task.deferred": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "task.picked": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "task_id",
+        "robot_id",
+        "epoch"
+      ],
+      "additionalProperties": true
+    },
+    "task.completed": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "task_id",
+        "robot_id",
+        "epoch"
+      ],
+      "additionalProperties": true
+    },
+    "task.stranded": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "robot_id",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "task.released_assignment": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "robot_id",
+        "epoch",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "authority.granted": {
+      "type": "object",
+      "properties": {
+        "holder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expires_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "holder",
+        "epoch",
+        "expires_tick",
+        "issuer_id"
+      ],
+      "additionalProperties": true,
+      "oneOf": [
+        {
+          "required": [
+            "scope_id"
+          ],
+          "not": {
+            "required": [
+              "task_id"
+            ]
+          }
+        },
+        {
+          "required": [
+            "task_id"
+          ],
+          "not": {
+            "required": [
+              "scope_id"
+            ]
+          }
+        }
+      ]
+    },
+    "authority.expired": {
+      "type": "object",
+      "properties": {
+        "holder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "holder",
+        "epoch"
+      ],
+      "additionalProperties": true,
+      "oneOf": [
+        {
+          "required": [
+            "scope_id"
+          ],
+          "not": {
+            "required": [
+              "task_id"
+            ]
+          }
+        },
+        {
+          "required": [
+            "task_id"
+          ],
+          "not": {
+            "required": [
+              "scope_id"
+            ]
+          }
+        }
+      ]
+    },
+    "authority.rejected": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "robot_id",
+        "epoch",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "network.message_sent": {
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sender": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deliver_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "message_id",
+        "sender",
+        "receiver",
+        "kind",
+        "deliver_tick",
+        "bytes"
+      ],
+      "additionalProperties": true
+    },
+    "network.message_delivered": {
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sender": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "message_id",
+        "sender",
+        "receiver"
+      ],
+      "additionalProperties": true
+    },
+    "network.message_dropped": {
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sender": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "message_id",
+        "sender",
+        "receiver",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "network.fault_started": {
+      "type": "object",
+      "properties": {
+        "fault_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fault_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targets": {
+          "type": "array"
+        },
+        "end_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "fault_id",
+        "fault_type",
+        "targets",
+        "end_tick"
+      ],
+      "additionalProperties": true
+    },
+    "network.fault_ended": {
+      "type": "object",
+      "properties": {
+        "fault_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fault_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targets": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "fault_id",
+        "fault_type",
+        "targets"
+      ],
+      "additionalProperties": true
+    },
+    "command.applied": {
+      "type": "object",
+      "properties": {
+        "command_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fault_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applied_tick": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "command_seq",
+        "fault_id",
+        "applied_tick"
+      ],
+      "additionalProperties": true
+    },
+    "command.rejected": {
+      "type": "object",
+      "properties": {
+        "command_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "command_seq",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "motion.conflict": {
+      "type": "object",
+      "properties": {
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "y": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "robot_id",
+        "target",
+        "reason"
+      ],
+      "additionalProperties": true
+    },
+    "motion.deadlock_suspected": {
+      "type": "object",
+      "properties": {
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "waiting_ticks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "robot_id",
+        "waiting_ticks"
+      ],
+      "additionalProperties": true
+    },
+    "recovery.reconciled": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "epoch",
+        "outcome"
+      ],
+      "additionalProperties": true
+    },
+    "recovery.unresolved": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "reason"
+      ],
+      "additionalProperties": true
+    }
+  }
+}
