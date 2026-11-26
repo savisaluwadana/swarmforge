@@ -25,7 +25,11 @@ test("real scenario, worker, evidence and benchmark",async({page})=>{
  await page.getByRole("button",{name:"Exit replay"}).click();
  const d=page.waitForEvent("download");await page.getByRole("button",{name:"Export JSON"}).click();expect((await d).suggestedFilename()).toMatch(/run-.*\.json/);
  await page.getByRole("link",{name:"Benchmark center"}).click();
- await page.getByLabel("Scenario",{exact:true}).selectOption({label:"Warehouse / controller outage"});
+ await expect(page.getByRole("heading",{name:"Compare coordination policies"})).toBeVisible();
+ const scenario=page.getByRole("combobox",{name:"Scenario",exact:true});
+ await expect(scenario.getByRole("option",{name:"Warehouse / controller outage",exact:true})).toBeAttached();
+ await scenario.selectOption({label:"Warehouse / controller outage"});
+ await expect(page.getByRole("combobox",{name:"Revision",exact:true})).toHaveValue("1");
  await page.getByLabel("Random seeds").fill("11");
  await page.getByRole("button",{name:"Launch benchmark · 3 runs"}).click();
  await expect(page.getByRole("heading",{name:"Measured policy comparison"})).toBeVisible();
