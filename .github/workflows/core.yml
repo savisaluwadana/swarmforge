@@ -34,6 +34,9 @@ jobs:
         run: make replay-auction PYTHON=python
       - name: Run predeclared research matrix with replay and trace audit
         run: make benchmark-research PYTHON=python
+      - name: Summarize and checksum measured evidence
+        if: always()
+        run: python scripts/release_evidence.py artifacts/benchmark-research
       - uses: actions/upload-artifact@v4
         if: always()
         with:

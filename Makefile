@@ -38,3 +38,13 @@ test-persistence:
 
 migrate:
 	$(PYTHON) -m swarmforge.persistence.migrate
+
+.PHONY: local-init scale-smoke evidence
+local-init:
+	$(PYTHON) scripts/init_local.py
+
+scale-smoke:
+	$(PYTHON) scripts/scale_smoke.py
+
+evidence:
+	$(PYTHON) scripts/release_evidence.py artifacts/benchmark-research

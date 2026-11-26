@@ -4,3 +4,8 @@
 artifacts
 **/__pycache__
 **/node_modules
+
+**/.next
+**/test-results
+**/playwright-report
+.env.*
