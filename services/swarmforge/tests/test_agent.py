@@ -43,6 +43,10 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(worker.once())
         report=self.assert_schema("AgentReport",self.client.get(self.prefix+"/agent/reports/"+result["benchmark_ids"][0]).json())
         self.assertTrue(report["facts"]);self.assertEqual(report["comparison"]["benchmark"]["successful_runs"],2)
+        self.assertTrue(report["observations"])
+        for e in report["observations"]:
+            page=self.client.get(self.prefix+"/runs/"+e["run_id"]+"/events",params={"after_seq":e["seq"]-1,"limit":1}).json()
+            actual=page["items"][0];self.assertEqual((actual["seq"],actual["type"],actual["tick"]),(e["seq"],e["event_type"],e["tick"]))
     def test_denial_expiry_role_quota(self):
         p=self.plan();self.assertEqual(self.decide(p,"deny").status_code,200);self.assertEqual(self.execute(p).status_code,409)
         p=self.plan();self.assertEqual(self.decide(p).status_code,200)

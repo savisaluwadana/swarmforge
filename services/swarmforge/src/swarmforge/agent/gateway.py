@@ -117,7 +117,19 @@ class Gateway:
             if r["run"]["status"]!="succeeded" or not r["metrics"]:continue
             for key in ("completed","released","latency_p50_ticks","latency_p95_ticks","completion_rate","messages_sent","actual_collisions","stranded"):
                 facts.append({"run_id":r["run"]["id"],"manifest_hash":r["run"]["manifest_hash"],"metric":key,"value":r["metrics"].get(key)})
-        return {"benchmark_id":str(bid),"comparison":comparison,"facts":facts,"limitations":["Synthetic simulation only, not physical safety evidence.","Failed or cancelled runs excluded from numeric comparisons; inspect missing counts.","Latency conditional on completed tasks; no claim of superiority."]}
+        # Each observation references an actual committed event, not an inferred cause.
+        with self.repo.connect() as c:
+            self.repo._authorize(c,p,w)
+            rows=c.execute("""SELECT run_id,seq,tick,event_type,payload FROM (
+                SELECT e.run_id,e.seq,e.tick,e.event_type,e.payload,
+                row_number() OVER (PARTITION BY e.run_id ORDER BY e.seq) AS rank
+                FROM run_events e JOIN runs r ON r.workspace_id=e.workspace_id AND r.id=e.run_id
+                WHERE e.workspace_id=%s AND r.benchmark_id=%s
+                AND e.event_type IN ('task.deferred','task.stranded','recovery.unresolved','authority.rejected','network.fault_started')
+            ) evidence WHERE rank<=3 ORDER BY run_id,seq LIMIT 120""",(w,bid)).fetchall()
+        observations=[wire({"run_id":r["run_id"],"seq":r["seq"],"tick":r["tick"],"event_type":r["event_type"],
+                           "task_id":r["payload"].get("task_id"),"reason":str(r["payload"].get("reason") or r["payload"].get("fault_type") or r["event_type"])[:512]}) for r in rows]
+        return {"benchmark_id":str(bid),"comparison":comparison,"facts":facts,"observations":observations,"limitations":["Synthetic simulation only, not physical safety evidence.","Failed or cancelled runs excluded from numeric comparisons; inspect missing counts.","Latency conditional on completed tasks; no claim of superiority.","Event observations show up to three selected committed events per run; consult the full trace for other events."]}
 
     def call(self,p,name,args):
         t=self.tools.get(name)

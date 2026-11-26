@@ -5458,13 +5458,69 @@
             },
             "minItems": 0,
             "maxItems": 10
+          },
+          "observations": {
+            "type": "array",
+            "maxItems": 120,
+            "items": {
+              "type": "object",
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "tick": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "event_type": {
+                  "type": "string",
+                  "enum": [
+                    "task.deferred",
+                    "task.stranded",
+                    "recovery.unresolved",
+                    "authority.rejected",
+                    "network.fault_started"
+                  ]
+                },
+                "task_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "run_id",
+                "seq",
+                "tick",
+                "event_type",
+                "task_id",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "benchmark_id",
           "comparison",
           "facts",
-          "limitations"
+          "limitations",
+          "observations"
         ],
         "additionalProperties": false,
         "$defs": {
