@@ -39,6 +39,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Generate isolated CI agent credentials
+        run: python -c 'import secrets,os; f=open(os.environ["GITHUB_ENV"],"a"); [f.write(k+"="+secrets.token_urlsafe(40)+"\n") for k in ("LOCAL_MCP_TOKEN","AGENT_APPROVAL_SECRET")]'
       - name: Install backend and migrate
         run: |
           python -m pip install -r services/swarmforge/requirements-persistence.txt
@@ -62,6 +64,8 @@ jobs:
             sleep 1
           done
           exit 1
+      - name: Official MCP client interoperability
+        run: python services/swarmforge/tests/mcp_client_smoke.py
       - name: Browser end-to-end
         working-directory: apps/web
         run: npm run test:e2e

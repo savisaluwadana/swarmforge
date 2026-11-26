@@ -67,3 +67,5 @@ CI 45783116219: build, projections, real service startup and mobile/keyboard tes
 
 ## R6 — agent gateway and MCP increment
 PR #9 final web/core/PostgreSQL checks all green (45783787293/45783787283/45783787301). Added agent tables, typed plan/decision/execution APIs, shared enqueue transaction, separate exact approval, local stateless MCP SDK and 13 tools, deterministic report, optional budget-gated model adapter and Agent Console. Real PostgreSQL/API/MCP integration tests pending. No external OAuth, live paid provider verification, LLM-generated evidence narrative or production step-up. R6 not complete until tests and review.
+
+Initial R6 code commit 70c2515 passed PostgreSQL/API/agent integration CI 45785571468 (9+6+5 tests). Follow-up 6e0c7f5 restricts MCP credentials; browser/official client checks added. Verify all latest workflows before merge.
