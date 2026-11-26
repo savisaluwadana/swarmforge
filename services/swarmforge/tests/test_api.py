@@ -128,6 +128,32 @@ class APITests(unittest.TestCase):
         cancelled=self.schema("Benchmark",self.post(f"/benchmarks/{b2['id']}/cancel"))
         self.assertEqual(cancelled["cancelled_runs"],4)
 
+    def test_interactive_command_and_evidence(self):
+        from swarmforge.worker.main import Worker
+        from concurrent.futures import ThreadPoolExecutor
+        import time
+        sid=self.scenario()
+        r=self.schema("Run",self.post("/runs",{"scenario_id":sid,"revision":1,"algorithm":"centralized_greedy","seed":42,"mode":"interactive"}))
+        rid=r["id"];path=f"/runs/{rid}"
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            f=pool.submit(Worker(self.repo,ROOT/"contracts").once)
+            for _ in range(100):
+                if self.client.get(self.prefix+path).json()["status"]=="running":break
+                time.sleep(.025)
+            cmd=self.schema("Command",self.post(path+"/commands",{"type":"packet_loss","duration_ticks":4,"links":[{"from":"r1","to":"C"}],"drop_rate":1},key="fault"))
+            self.assertEqual(cmd,self.post(path+"/commands",{"type":"packet_loss","duration_ticks":4,"links":[{"from":"r1","to":"C"}],"drop_rate":1},key="fault"))
+            self.assertTrue(f.result(timeout=30))
+        r=self.client.get(self.prefix+path).json()
+        self.assertEqual(r["status"],"succeeded",r)
+        commands=self.schema("CommandPage",self.client.get(self.prefix+path+"/commands").json())
+        self.assertEqual(commands["items"][0]["status"],"applied")
+        exp=self.schema("RunExport",self.client.get(self.prefix+path+"/export").json())
+        applied=[e for e in exp["events"] if e["type"]=="command.applied"]
+        self.assertEqual(len(applied),1)
+        self.assertEqual(applied[0]["tick"],commands["items"][0]["applied_tick"])
+        self.assertEqual(len(exp["manifest"]["config"]["faults"]),len(fixture()["faults"]))
+        self.assertTrue(any(e["type"]=="network.fault_started" and e["payload"]["fault_id"]==applied[0]["payload"]["fault_id"] for e in exp["events"]))
+
     def test_validation_and_oversize(self):
         self.assertEqual(self.client.post(self.prefix+"/scenarios",json={"name":"x"},headers={"Idempotency-Key":"a"}).status_code,422)
         r=self.client.post(self.prefix+"/scenarios",content=b"x"*262145,headers={"Content-Type":"application/json","Idempotency-Key":"a"})

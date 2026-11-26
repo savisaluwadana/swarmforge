@@ -169,7 +169,8 @@ def create_app(repo,auth,contracts="contracts"):
     @app.post(prefix+"/runs/{run_id}/commands",status_code=202)
     def command(workspace_id:UUID,run_id:UUID,body:dict,k=Depends(key),p=Depends(principal)):
         repo.authorize_editor(p,workspace_id);repo.get_run(p,workspace_id,run_id);validate("FaultCommand",body)
-        raise Conflict("interactive fault injection not yet supported; use a scripted scenario revision")
+        if body["type"]=="robot_crash" and body["duration_ticks"] is not None:raise ValueError("robot crash must be permanent")
+        return repo.queue_command(p,workspace_id,run_id,body,k)
     @app.get(prefix+"/runs/{run_id}/commands")
     def commands(workspace_id:UUID,run_id:UUID,pg=Depends(page),p=Depends(principal)):return repo.commands(p,workspace_id,run_id,*pg)
     @app.get(prefix+"/runs/{run_id}/metrics")

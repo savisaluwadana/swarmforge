@@ -177,6 +177,20 @@ class ControlRepository(Repository):
                     comparisons.append({k:v for k,v in r.items() if k not in ("condition","paired_differences")})
             return {"benchmark":b,"runs":runs,"summaries":summaries,"paired_comparisons":comparisons}
 
+    def queue_command(self,p,w,rid,payload,key):
+        with self.connect() as c:
+            self._authorize(c,p,w,True)
+            def create():
+                r=self._get_run(c,w,rid,True)
+                if r["status"]!="running" or r["mode"]!="interactive":raise Conflict("active interactive run required")
+                if r["last_command_seq"]>=20:raise QuotaExceeded("interactive command limit")
+                seq=r["last_command_seq"]+1
+                row=c.execute("INSERT INTO run_commands(workspace_id,run_id,command_seq,actor_id,payload) VALUES (%s,%s,%s,%s,%s) RETURNING *",(w,rid,seq,p.user_id,Jsonb(payload))).fetchone()
+                c.execute("UPDATE runs SET last_command_seq=%s WHERE workspace_id=%s AND id=%s",(seq,w,rid))
+                self._audit(c,w,p.user_id,"run.command_queued","run",rid)
+                return select(row,"command_seq status payload applied_tick rejection_reason created_at")
+            return self._idem(c,p,w,"command:"+str(rid),key,payload,202,create)
+
     def commands(self,p,w,rid,limit,cursor):
         with self.connect() as c:
             self._authorize(c,p,w);self._get_run(c,w,rid)

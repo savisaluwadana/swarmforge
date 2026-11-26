@@ -626,12 +626,21 @@
         "applied_tick": {
           "type": "integer",
           "minimum": 0
+        },
+        "fault": {
+          "type": "object",
+          "required": [
+            "type",
+            "start_tick",
+            "end_tick"
+          ]
         }
       },
       "required": [
         "command_seq",
         "fault_id",
-        "applied_tick"
+        "applied_tick",
+        "fault"
       ],
       "additionalProperties": true
     },

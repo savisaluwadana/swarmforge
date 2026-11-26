@@ -1488,7 +1488,7 @@
           "Runs"
         ],
         "summary": "Queue simulation run",
-        "description": "Queue a scripted simulation. Interactive mode currently returns 409; scheduled faults are supported in immutable scenario revisions.",
+        "description": "Queue scripted or interactive simulation. Interactive runs limited to 300 logical ticks and paced at 100 ms wall time per tick; actual applied commands are recorded. Scripted replay only.",
         "security": [
           {
             "bearerAuth": []
@@ -2380,7 +2380,7 @@
           "Runs"
         ],
         "summary": "Queue fault in running interactive simulation",
-        "description": "R4 scripted-only preview: returns 409 without side effects. Interactive execution requires a subsequent reviewed implementation; use scenario revisions with scheduled faults.",
+        "description": "Queue an interactive simulation fault (20 commands/run). Worker validates against existing faults and applies at next sampled logical tick; status persisted with events. Scripted or terminal runs return 409.",
         "security": [
           {
             "bearerAuth": []
