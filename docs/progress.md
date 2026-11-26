@@ -20,3 +20,8 @@ Inspect CI and fix any failures before implementing scoped authority, local auct
 
 ### CI iteration 1
 [First workflow](https://github.com/savisaluwadana/swarmforge/actions/runs/45774186850): compilation passed; 11 tests executed, 7 errored because the event emitter's `kind` parameter collided with the network message payload key. Renamed the emitter parameter without altering the event contract. Tightened the outage assertion to verify no task pickup or message delivery during isolation, rather than treating the controller's local tentative reservation as a delivered grant. Rerun required.
+
+### CI iteration 2 — verified evidence
+Code commit `8c924695da626a36d47b4250690a70bfc4cc4131`. [Passing workflow](https://github.com/savisaluwadana/swarmforge/actions/runs/45774271575), Python 3.12.16. Compile passed; `make test PYTHON=python`: 11 tests, OK (0.105s), including 300 seeded movement cases and 10 seeded packet-loss simulations. `make demo PYTHON=python`: succeeded. `make replay PYTHON=python`: verified identical semantic trace digest. [Raw JSON artifact](https://github.com/savisaluwadana/swarmforge/actions/runs/45774271575/artifacts/15094908412).
+
+Fixture: two robots, two tasks, 50 logical ticks at 1000 ms, seed 42, controller outage ticks 5–19 inclusive. Reported 2 completed, 0 stranded, 100% completion, 2.4 tasks/simulated minute, p50 latency 14 ticks, p95 20 ticks, 0 simulated collisions, 0 duplicate accepted actions; 134 messages sent, 89 delivered, 43 dropped, 2 in flight. Digest `17d0bdec726ed3a4e764a3a9adaf27666c1a8e0df1f8376b2c5b1a84a797748f`. These are simulation smoke results, not a comparative benchmark or evidence of physical safety. No claim of experimental superiority. Remaining acceptance gates listed above still apply.
