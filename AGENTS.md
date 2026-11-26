@@ -6,7 +6,9 @@ Read README, docs/product.md, docs/architecture.md, docs/coordination.md, docs/w
 - If contract inconsistency found, document and update contract + tests in same PR before downstream code.
 - UI: premium restrained industrial design, responsive and accessible, actual persisted data, explicit loading/empty/error states. Mock fixtures only in tests/storybook clearly labeled.
 - All experiments must be reproducible. No fake charts, invented benchmark numbers, unverifiable citations or claims of physical safety, novelty or production readiness.
-- Keep AI assistant read-only and optional. Do not add physical robotics control, Kubernetes, Redis, Kafka, GPU training, or paid cloud resources without explicit approval.
+- Keep model output advisory until an authenticated human approves an exact simulation plan. Implement bounded agent gateway and MCP in R6 according to docs/agent-platform.md; no agent may self-approve, bypass quota, control physical hardware or enter the deterministic control loop. Do not add physical robotics control, Kubernetes, Redis, Kafka, GPU training, or paid cloud resources without explicit approval.
 - Never commit keys, credentials or personal data. Use env placeholders.
 - Tests: unit, property, integration against real PostgreSQL, API contract, SSE recovery, E2E critical path. Report exact commands and results.
 - Update implementation progress in docs with what is done, blockers and next tasks. Do not modify unrelated files.
+
+- Read docs/mvp-release.md, docs/agent-platform.md, docs/demo-guide.md and contracts/agent-tools.json before any further implementation. Follow R0–R7 gates, keep each PR scoped, update progress with actual CI and artifacts; no new feature creep. Current tool contract is a proposal; R6 must add executable schemas and authorization tests before exposing MCP.
