@@ -1,0 +1,27 @@
+# Implementation progress
+
+## Milestone 1 — deterministic core (26 November 2026)
+Based on merged architecture PR #1. Implemented code for scenario validation, a pure integer-tick simulator, deterministic JSON and trace hashing, directed network emulator with scripted outages/partition/loss/latency/crash, bounded space-time A*, shared conservative movement arbiter, centralized greedy policy using delivered statuses, modeled task authority, crash-while-carrying stranding, CLI run/replay and measured metrics. Added a two-robot fixture, Makefile, Python package and CI. Runtime has no third-party dependencies.
+
+### Verification
+CI is configured to compile, execute unit/randomized invariant tests, run the actual smoke scenario and verify replay. No passing test claim until execution results are observed. The local assistant execution environment could not resolve github.com, so the exact checkout cannot be cloned there. See PR checks for actual remote verification.
+
+### Deliberate limitations / contract clarifications
+- This is a partial milestone, not the final application. Local auction and scoped lease fail closed. No multi-policy benchmarks, database/API, worker, UI, Docker Compose or deployment.
+- Tick 0 initial snapshot is captured immediately after run.started. The run executes ticks [0,duration); terminal event uses duration. Central grants expire at run end, are retried until acknowledged, and are never reassigned yet. Unpicked crash or lost grant remains assigned/uncertain, rather than pretending recovery. Controller outage isolates links; task release at controller is exogenous. Controller decisions use delivered statuses (freshness based on receipt tick), not current global robot state.
+- Conservative path planner uses static map, not other robot positions; arbiter rejects all currently occupied cells, even if vacating. Deadlock detection only, no resolution. Local completion tombstones are repeatedly transmitted; bounded by task cap but traffic overhead is intentionally visible. No physical safety claim.
+- Current CLI export is an internal core result (manifest, events, snapshots, metrics), not yet REST RunExport shape. Core metrics include basic counters and latency; recovery, utilization, paired comparisons, full payload schema validation, failure-result preservation and database integration remain open.
+- JSON canonicalization uses Python sorted compact JSON, normalizes integral floats/negative zero, rejects nonfinite values; cross-runtime canonicalization not yet guaranteed. CLI engine version defaults to package version; pass git SHA with --engine-version for research evidence and replay with the identical build. Runtime lock hash identifies the stdlib-only core; a full environment lock remains pending.
+- Tests include randomized movement invariants using seeded stdlib PRNG; Hypothesis and integration tests remain pending.
+- API example lacks optional due_tick, allowed by contract; no changes to the OpenAPI/SQL schema. No database migration executed yet.
+
+### Next gate
+Inspect CI and fix any failures before implementing scoped authority, local auction and reconciliation. Add event payload and OpenAPI schema validation, test stale grants and safe unpicked release, then benchmark matched scenarios. Do not start UI before core correctness gates pass.
+
+### CI iteration 1
+[First workflow](https://github.com/savisaluwadana/swarmforge/actions/runs/45774186850): compilation passed; 11 tests executed, 7 errored because the event emitter's `kind` parameter collided with the network message payload key. Renamed the emitter parameter without altering the event contract. Tightened the outage assertion to verify no task pickup or message delivery during isolation, rather than treating the controller's local tentative reservation as a delivered grant. Rerun required.
+
+### CI iteration 2 — verified evidence
+Code commit `8c924695da626a36d47b4250690a70bfc4cc4131`. [Passing workflow](https://github.com/savisaluwadana/swarmforge/actions/runs/45774271575), Python 3.12.16. Compile passed; `make test PYTHON=python`: 11 tests, OK (0.105s), including 300 seeded movement cases and 10 seeded packet-loss simulations. `make demo PYTHON=python`: succeeded. `make replay PYTHON=python`: verified identical semantic trace digest. [Raw JSON artifact](https://github.com/savisaluwadana/swarmforge/actions/runs/45774271575/artifacts/15094908412).
+
+Fixture: two robots, two tasks, 50 logical ticks at 1000 ms, seed 42, controller outage ticks 5–19 inclusive. Reported 2 completed, 0 stranded, 100% completion, 2.4 tasks/simulated minute, p50 latency 14 ticks, p95 20 ticks, 0 simulated collisions, 0 duplicate accepted actions; 134 messages sent, 89 delivered, 43 dropped, 2 in flight. Digest `17d0bdec726ed3a4e764a3a9adaf27666c1a8e0df1f8376b2c5b1a84a797748f`. These are simulation smoke results, not a comparative benchmark or evidence of physical safety. No claim of experimental superiority. Remaining acceptance gates listed above still apply.

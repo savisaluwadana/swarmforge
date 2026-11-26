@@ -1,0 +1,1 @@
+"""Deterministic directed-link emulator."""
