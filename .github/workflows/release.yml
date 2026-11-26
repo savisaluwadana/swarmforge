@@ -17,23 +17,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Resolve dependency locks
+      - name: Verify committed dependency locks
         run: |
           python -m venv /tmp/swarmforge-lock
-          /tmp/swarmforge-lock/bin/pip install -r services/swarmforge/requirements-persistence.txt
+          /tmp/swarmforge-lock/bin/pip install -r services/swarmforge/requirements.lock
           /tmp/swarmforge-lock/bin/pip check
-          /tmp/swarmforge-lock/bin/pip freeze > services/swarmforge/requirements.lock
+          /tmp/swarmforge-lock/bin/pip freeze > /tmp/actual.lock
+          diff -u services/swarmforge/requirements.lock /tmp/actual.lock
           cd apps/web
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Emit reproducible lock manifests
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          for name in ("services/swarmforge/requirements.lock","apps/web/package-lock.json"):
-              print("LOCK_BEGIN "+name)
-              print(Path(name).read_text(),end="")
-              print("LOCK_END "+name)
-          PY
+          npm ci --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
       - uses: actions/upload-artifact@v4
         with:
           name: dependency-locks
@@ -67,9 +60,9 @@ jobs:
           exit 1
       - name: Install acceptance clients
         run: |
-          python -m pip install -r services/swarmforge/requirements-persistence.txt
+          python -m pip install -r services/swarmforge/requirements.lock
           cd apps/web
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Actual Compose security, MCP and browser acceptance
         run: |
@@ -118,7 +111,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -r services/swarmforge/requirements-benchmark.txt
+      - run: python -m pip install -r services/swarmforge/requirements.lock
       - name: Characterize independent scale boundaries
         run: python scripts/scale_smoke.py
       - uses: actions/upload-artifact@v4

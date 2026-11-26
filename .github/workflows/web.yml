@@ -43,13 +43,13 @@ jobs:
         run: python -c 'import secrets,os; f=open(os.environ["GITHUB_ENV"],"a"); [f.write(k+"="+secrets.token_urlsafe(40)+"\n") for k in ("LOCAL_MCP_TOKEN","AGENT_APPROVAL_SECRET")]'
       - name: Install backend and migrate
         run: |
-          python -m pip install -r services/swarmforge/requirements-persistence.txt
+          python -m pip install -r services/swarmforge/requirements.lock
           python -m swarmforge.persistence.migrate
           python -m swarmforge.api.seed
       - name: Install frontend and test projections
         working-directory: apps/web
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm test
           npm run build
           npx playwright install --with-deps chromium

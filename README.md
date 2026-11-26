@@ -40,7 +40,7 @@ Download the [research artifact](https://github.com/savisaluwadana/swarmforge/ac
 ## Research CLI
 
 ```bash
-python3 -m pip install -r services/swarmforge/requirements-benchmark.txt
+python3 -m pip install -r services/swarmforge/requirements.lock
 make test
 make demo && make replay
 make demo-auction && make replay-auction

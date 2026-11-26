@@ -13,7 +13,7 @@ Start the stack using the README. Use an MCP host that supports Streamable HTTP 
 
 Run the same tested SDK workflow from the checkout in a dedicated local lab (creates two real simulation runs):
 ```bash
-python3 -m pip install -r services/swarmforge/requirements-persistence.txt
+python3 -m pip install -r services/swarmforge/requirements.lock
 set -a; . ./.env; set +a
 python3 services/swarmforge/tests/mcp_client_smoke.py
 ```
