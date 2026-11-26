@@ -106,6 +106,13 @@ class Repository:
             if not row: raise NotFound("revision")
             return row
 
+    def _insert_run(self,c,p,w,sid,revision,algorithm,seed,config,config_hash,mode="scripted",benchmark_id=None):
+        manifest=build_manifest(config,seed,self.engine_version,str(sid),revision,algorithm,mode)
+        if manifest["config_hash"]!=config_hash:raise Conflict("revision hash mismatch")
+        rid=uuid4()
+        c.execute("INSERT INTO runs(workspace_id,id,scenario_id,revision,benchmark_id,algorithm,seed,mode,engine_version,manifest,manifest_hash,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(w,rid,sid,revision,benchmark_id,algorithm,seed,mode,self.engine_version,Jsonb(manifest),digest(manifest),p.user_id))
+        return rid
+
     def enqueue(self,p,w,sid,revision,algorithm,seed,key,mode="scripted"):
         if mode not in ("scripted","interactive"):
             raise ValueError("unsupported execution mode")
@@ -118,10 +125,7 @@ class Repository:
                 if r["archived_at"]: raise Conflict("archived scenario")
                 count=c.execute("SELECT count(*) AS n FROM runs WHERE workspace_id=%s AND status IN ('queued','running','cancelling')",(w,)).fetchone()["n"]
                 if count>=self.max_workspace_pending: raise QuotaExceeded("workspace pending run limit")
-                manifest=build_manifest(r["config"],seed,self.engine_version,str(sid),revision,algorithm,mode)
-                if manifest["config_hash"]!=r["config_hash"]: raise Conflict("revision hash mismatch")
-                rid=uuid4()
-                c.execute("INSERT INTO runs(workspace_id,id,scenario_id,revision,algorithm,seed,mode,engine_version,manifest,manifest_hash,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(w,rid,sid,revision,algorithm,seed,mode,self.engine_version,Jsonb(manifest),digest(manifest),p.user_id))
+                rid=self._insert_run(c,p,w,sid,revision,algorithm,seed,r["config"],r["config_hash"],mode)
                 self._audit(c,w,p.user_id,"run.enqueued","run",rid)
                 return {"run_id":str(rid),"status":"queued","response":run_view(self._get_run(c,w,rid))}
             return self._idem(c,p,w,"enqueue",key,body,202,create)

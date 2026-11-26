@@ -34,7 +34,7 @@ def csv_response(rows,name):
     return Response(buf.getvalue(),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="{name}.csv"'})
 
 
-def create_app(repo,auth,contracts="contracts"):
+def create_app(repo,auth,contracts="contracts",provider=None,approval_secret=None):
     contract=json.loads((Path(contracts)/"openapi.json").read_text())
     registry=Registry().with_resource("urn:swarmforge:api",Resource.from_contents(contract,default_specification=DRAFT202012))
     def validate(name,value):
@@ -85,7 +85,7 @@ def create_app(repo,auth,contracts="contracts"):
         try:
             with repo.connect() as c:
                 v={r["version"] for r in c.execute("SELECT version FROM schema_migrations").fetchall()}
-                if not {"001_initial.sql","002_full_metrics.sql"}<=v:raise RuntimeError()
+                if not {"001_initial.sql","002_full_metrics.sql","003_agent.sql"}<=v:raise RuntimeError()
             return {"status":"ok"}
         except Exception:raise HTTPException(503,"Database or schema unavailable")
     @app.get("/api/v1/me")
@@ -212,6 +212,40 @@ def create_app(repo,auth,contracts="contracts"):
         result=repo.comparison(p,workspace_id,benchmark_id)
         if format=="json":return result
         return csv_response([{"run_id":r["run"]["id"],"algorithm":r["run"]["algorithm"],"seed":r["run"]["seed"],"status":r["run"]["status"],**{k:v for k,v in (r["metrics"] or {}).items() if not isinstance(v,dict)}} for r in result["runs"]],"benchmark")
+    from swarmforge.agent.gateway import Gateway
+    from swarmforge.agent.provider import Provider,start_session,get_session
+    from swarmforge.agent.mcp import install
+    import hmac
+    gateway=Gateway(repo,contracts);model=provider or Provider()
+    secret=approval_secret if approval_secret is not None else os.getenv("AGENT_APPROVAL_SECRET","")
+    def require_human(x_approval_secret:str|None=Header(None)):
+        if len(secret)<32 or secret==getattr(auth,"token",None) or not x_approval_secret or not hmac.compare_digest(secret.encode(),x_approval_secret.encode()):
+            raise Forbidden("separate approval credential required")
+    @app.post(prefix+"/agent/plans",status_code=201)
+    def agent_draft(workspace_id:UUID,body:dict,k=Depends(key),p=Depends(principal)):
+        return gateway.draft(p,workspace_id,body,k)
+    @app.get(prefix+"/agent/plans/{plan_id}")
+    def agent_get(workspace_id:UUID,plan_id:UUID,p=Depends(principal)):
+        return gateway.get(p,workspace_id,plan_id)
+    @app.post(prefix+"/agent/plans/{plan_id}/approve",dependencies=[Depends(require_human)])
+    def agent_approve(workspace_id:UUID,plan_id:UUID,body:dict,p=Depends(principal)):
+        validate("AgentDecision",body);return gateway.decide(p,workspace_id,plan_id,body["expected_plan_hash"],"approved")
+    @app.post(prefix+"/agent/plans/{plan_id}/deny",dependencies=[Depends(require_human)])
+    def agent_deny(workspace_id:UUID,plan_id:UUID,body:dict,p=Depends(principal)):
+        validate("AgentDecision",body);return gateway.decide(p,workspace_id,plan_id,body["expected_plan_hash"],"denied")
+    @app.post(prefix+"/agent/plans/{plan_id}/execute",status_code=202)
+    def agent_execute(workspace_id:UUID,plan_id:UUID,body:dict,k=Depends(key),p=Depends(principal)):
+        validate("AgentDecision",body);return gateway.execute(p,workspace_id,plan_id,body["expected_plan_hash"],k)
+    @app.post(prefix+"/agent/sessions",status_code=201)
+    def agent_session(workspace_id:UUID,body:dict,k=Depends(key),p=Depends(principal)):
+        return start_session(gateway,model,p,workspace_id,body,k)
+    @app.get(prefix+"/agent/sessions/{session_id}")
+    def agent_get_session(workspace_id:UUID,session_id:UUID,p=Depends(principal)):
+        return get_session(gateway,p,workspace_id,session_id)
+    @app.get(prefix+"/agent/reports/{benchmark_id}")
+    def agent_report(workspace_id:UUID,benchmark_id:UUID,p=Depends(principal)):
+        return gateway.report(p,workspace_id,benchmark_id)
+    install(app,gateway,auth)
     return app
 
 
