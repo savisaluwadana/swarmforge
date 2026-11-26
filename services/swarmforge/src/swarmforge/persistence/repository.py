@@ -8,6 +8,7 @@ from swarmforge.application.identity import Principal,NotFound,Forbidden,Conflic
 from swarmforge.core.trace import digest
 from swarmforge.core.simulator import build_manifest
 from swarmforge.domain.model import validate_config
+from swarmforge.application.views import run_view,revision_view,scenario_view
 
 CLAIM_LOCK=734182902
 TERMINAL=("succeeded","failed","cancelled")
@@ -76,7 +77,7 @@ class Repository:
                 c.execute("INSERT INTO scenarios(workspace_id,id,name,created_by) VALUES (%s,%s,%s,%s)",(w,sid,name,p.user_id))
                 self._insert_revision(c,p,w,sid,1,config)
                 self._audit(c,w,p.user_id,"scenario.created","scenario",sid)
-                return {"scenario_id":str(sid),"revision":1}
+                return {"scenario_id":str(sid),"revision":1,"response":{"scenario":scenario_view(c,w,sid),"revision":revision_view(c.execute("SELECT * FROM scenario_revisions WHERE workspace_id=%s AND scenario_id=%s AND version=1",(w,sid)).fetchone())}}
             return self._idem(c,p,w,"create_scenario",key,{"name":name,"config":config},201,create)
 
     def _insert_revision(self,c,p,w,sid,version,config):
@@ -93,7 +94,7 @@ class Repository:
                 version=c.execute("SELECT max(version)+1 AS version FROM scenario_revisions WHERE workspace_id=%s AND scenario_id=%s",(w,sid)).fetchone()["version"]
                 self._insert_revision(c,p,w,sid,version,config)
                 self._audit(c,w,p.user_id,"scenario.revised","scenario",sid)
-                return {"scenario_id":str(sid),"revision":version}
+                return {"scenario_id":str(sid),"revision":version,"response":revision_view(c.execute("SELECT * FROM scenario_revisions WHERE workspace_id=%s AND scenario_id=%s AND version=%s",(w,sid,version)).fetchone())}
             return self._idem(c,p,w,"create_revision:"+str(sid),key,config,201,create)
 
     def get_revision(self,p,w,sid,version):
@@ -120,7 +121,7 @@ class Repository:
                 rid=uuid4()
                 c.execute("INSERT INTO runs(workspace_id,id,scenario_id,revision,algorithm,seed,mode,engine_version,manifest,manifest_hash,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(w,rid,sid,revision,algorithm,seed,mode,self.engine_version,Jsonb(manifest),digest(manifest),p.user_id))
                 self._audit(c,w,p.user_id,"run.enqueued","run",rid)
-                return {"run_id":str(rid),"status":"queued"}
+                return {"run_id":str(rid),"status":"queued","response":run_view(self._get_run(c,w,rid))}
             return self._idem(c,p,w,"enqueue",key,body,202,create)
 
     def _get_run(self,c,w,rid,lock=False):
@@ -176,7 +177,7 @@ class Repository:
                 elif status!="cancelling":
                     raise Conflict("terminal run")
                 self._audit(c,w,p.user_id,"run.cancel_requested","run",rid)
-                return {"run_id":str(rid),"status":status}
+                return {"run_id":str(rid),"status":status,"response":run_view(self._get_run(c,w,rid))}
             return self._idem(c,p,w,"cancel:"+str(rid),key,{},202,change)
 
     # Worker-only methods below. No user-supplied lease token is accepted by HTTP.
