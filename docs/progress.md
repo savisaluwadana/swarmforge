@@ -43,3 +43,6 @@ Added peer-local auction, aligned bid windows, shared predeclared release model,
 
 ## R2 — benchmark harness (implementation pending CI verification)
 Predeclared 12-run smoke and 72-run research subset, contract and independent trace audit, matched seed comparison, seeded bootstrap, recovery and utilization metrics, raw trace/CSV/JSON export, retained failures and CI. R2 results must be recorded from actual execution. No API, database, frontend or agent changes.
+
+## R3 — PostgreSQL and durable worker
+R2 latest CI 45779765500 verified successful before R3. Implemented SQL migration runner, full metrics storage, authenticated-principal repository boundary, immutable revisions, idempotent enqueue/cancel, global/workspace admission quotas, fenced leases, event and snapshot persistence, durable worker with heartbeat and cooperative cancellation, independent trace audit before terminal success, health-only API and Compose foundation. Added real PostgreSQL integration CI; results pending. No resource REST, external auth, live commands, benchmark fanout, frontend or MCP yet. Explicit SQL rather than ORM chosen for auditable transactions. Maximum-load memory and Compose runtime verification remain open until tested.

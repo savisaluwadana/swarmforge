@@ -354,13 +354,20 @@ class Simulation:
                 if score is not None:
                     self.network.send(tick,rid,m.sender,"bid",{"task_id":b["task_id"],"round":b["round"],"score":score})
 
-    def run(self):
+    def run(self, checkpoint=None):
+        """Optional observer receives state and trace at completed tick boundaries.
+
+        Observer is outside policy logic; it may abort execution, never mutate inputs.
+        No wall clock or persistence dependencies enter the core.
+        """
         if self.started:
             raise RuntimeError("simulation already executed")
         self.started=True
         self.local_completed=set()
         self.trace.emit("run.started",manifest_hash=digest(self.manifest),engine_version=self.manifest["engine_version"])
         initial=self.snapshot()
+        if checkpoint is not None:
+            checkpoint(initial,self.trace.events)
         for tick in range(self.duration):
             self.trace.tick=tick
             self.apply_faults(tick)
@@ -414,6 +421,8 @@ class Simulation:
             self.move_and_act(tick)
             if tick%10==0:
                 self.trace.emit("run.progress",completed=sum(t.status=="completed" for t in self.tasks.values()),released=sum(t.released for t in self.tasks.values()),duration_ticks=self.duration)
+            if checkpoint is not None:
+                checkpoint(self.snapshot(),self.trace.events)
         self.trace.tick=self.duration
         self.expire_scopes(self.duration)
         self.trace.emit("run.finished",status="succeeded",trace_hash="")

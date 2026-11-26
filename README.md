@@ -70,3 +70,12 @@ The CLI supports three scripted policies. The peer auction is a simplified basel
 
 ## R2 research benchmark
 Install pinned validation dependencies: `python3 -m pip install -r services/swarmforge/requirements-benchmark.txt`. Run `make benchmark-smoke` (12 runs) or `make benchmark-research` (72 runs including the smoke subset). Each run validates the trace and replays the same manifest. Inspect summary.json, runs.csv, comparisons.csv and raw traces in the output directory. Failures retained; no statistical claim from small smoke fixtures.
+
+## R3 persistent worker (local development)
+```bash
+cp .env.example .env
+# Edit POSTGRES_PASSWORD and DATABASE_URL to matching local credentials.
+docker compose up --build
+curl http://127.0.0.1:8000/health/ready
+```
+Health-only API at this stage; REST resource endpoints and authentication are R4. For integration tests, use a dedicated PostgreSQL 16 test database and install `services/swarmforge/requirements-persistence.txt`; set SWARMFORGE_TEST_DATABASE_URL and run `make test-persistence`. Tests create and remove an isolated schema. Never point tests at production. Engine version must match across enqueue and worker; use a build identifier for reproducible evidence.

@@ -31,3 +31,10 @@ benchmark-smoke:
 
 benchmark-research:
 	$(PYTHON) -m swarmforge.cli benchmark --suite research --output artifacts/benchmark-research --engine-version "$$(git rev-parse HEAD)"
+
+.PHONY: test-persistence migrate
+test-persistence:
+	$(PYTHON) -m unittest discover -s services/swarmforge/tests -p test_persistence.py -v
+
+migrate:
+	$(PYTHON) -m swarmforge.persistence.migrate

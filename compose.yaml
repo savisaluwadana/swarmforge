@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: swarmforge
+      POSTGRES_USER: swarmforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swarmforge -d swarmforge"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    environment: &app_env
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      ENGINE_VERSION: ${ENGINE_VERSION:-0.3.0}
+    command: ["python","-m","swarmforge.persistence.migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    environment: *app_env
+    command: ["uvicorn","swarmforge.api.health:app","--host","0.0.0.0","--port","8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    environment: *app_env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  pgdata:

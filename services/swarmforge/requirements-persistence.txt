@@ -1,0 +1,4 @@
+-r requirements-benchmark.txt
+psycopg[binary]==3.2.9
+fastapi==0.115.12
+uvicorn==0.34.2
