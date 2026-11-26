@@ -79,3 +79,6 @@ docker compose up --build
 curl http://127.0.0.1:8000/health/ready
 ```
 Health-only API at this stage; REST resource endpoints and authentication are R4. For integration tests, use a dedicated PostgreSQL 16 test database and install `services/swarmforge/requirements-persistence.txt`; set SWARMFORGE_TEST_DATABASE_URL and run `make test-persistence`. Tests create and remove an isolated schema. Never point tests at production. Engine version must match across enqueue and worker; use a build identifier for reproducible evidence.
+
+## R4 REST API preview
+Set AUTH_MODE=local in .env and generate LOCAL_DEMO_TOKEN (e.g. `python3 -c 'import secrets; print(secrets.token_urlsafe(40))'`); retain loopback-only port. Start Compose and explicitly seed: `docker compose exec api python -m swarmforge.api.seed`. Use Authorization: Bearer <token> for /api/v1/me, /openapi.json for contracts, and the returned workspace ID for scenario, run and benchmark APIs. No token in URLs or commits. External deployment requires OIDC, TLS and operational review. Scripted scenarios and bounded interactive runs are supported; interactive runs preserve actual command events and support event playback (not scripted rerun). See docs/api.md.

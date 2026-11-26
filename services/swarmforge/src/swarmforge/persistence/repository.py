@@ -8,6 +8,7 @@ from swarmforge.application.identity import Principal,NotFound,Forbidden,Conflic
 from swarmforge.core.trace import digest
 from swarmforge.core.simulator import build_manifest
 from swarmforge.domain.model import validate_config
+from swarmforge.application.views import run_view,revision_view,scenario_view
 
 CLAIM_LOCK=734182902
 TERMINAL=("succeeded","failed","cancelled")
@@ -60,6 +61,8 @@ class Repository:
         if row:
             if row["request_hash"]!=h:
                 raise Conflict("idempotency key reused with different body")
+            if (operation in ("create_scenario","enqueue") or operation.startswith(("create_revision:","cancel:"))) and "response" not in row["response_body"]:
+                raise Conflict("legacy idempotency record; retrieve the original resource before issuing a new request")
             return row["response_body"]
         result=fn()
         c.execute("INSERT INTO idempotency_keys(workspace_id,actor_id,operation,key,request_hash,response_status,response_body,expires_at) VALUES (%s,%s,%s,%s,%s,%s,%s,clock_timestamp()+interval '24 hours')",(*args,h,status,Jsonb(result)))
@@ -76,7 +79,7 @@ class Repository:
                 c.execute("INSERT INTO scenarios(workspace_id,id,name,created_by) VALUES (%s,%s,%s,%s)",(w,sid,name,p.user_id))
                 self._insert_revision(c,p,w,sid,1,config)
                 self._audit(c,w,p.user_id,"scenario.created","scenario",sid)
-                return {"scenario_id":str(sid),"revision":1}
+                return {"scenario_id":str(sid),"revision":1,"response":{"scenario":scenario_view(c,w,sid),"revision":revision_view(c.execute("SELECT * FROM scenario_revisions WHERE workspace_id=%s AND scenario_id=%s AND version=1",(w,sid)).fetchone())}}
             return self._idem(c,p,w,"create_scenario",key,{"name":name,"config":config},201,create)
 
     def _insert_revision(self,c,p,w,sid,version,config):
@@ -93,7 +96,7 @@ class Repository:
                 version=c.execute("SELECT max(version)+1 AS version FROM scenario_revisions WHERE workspace_id=%s AND scenario_id=%s",(w,sid)).fetchone()["version"]
                 self._insert_revision(c,p,w,sid,version,config)
                 self._audit(c,w,p.user_id,"scenario.revised","scenario",sid)
-                return {"scenario_id":str(sid),"revision":version}
+                return {"scenario_id":str(sid),"revision":version,"response":revision_view(c.execute("SELECT * FROM scenario_revisions WHERE workspace_id=%s AND scenario_id=%s AND version=%s",(w,sid,version)).fetchone())}
             return self._idem(c,p,w,"create_revision:"+str(sid),key,config,201,create)
 
     def get_revision(self,p,w,sid,version):
@@ -104,8 +107,8 @@ class Repository:
             return row
 
     def enqueue(self,p,w,sid,revision,algorithm,seed,key,mode="scripted"):
-        if mode!="scripted":
-            raise Conflict("interactive execution not implemented in R3")
+        if mode not in ("scripted","interactive"):
+            raise ValueError("unsupported execution mode")
         body={"scenario_id":str(sid),"revision":revision,"algorithm":algorithm,"seed":seed,"mode":mode}
         with self.connect() as c:
             self._authorize(c,p,w,True)
@@ -115,12 +118,12 @@ class Repository:
                 if r["archived_at"]: raise Conflict("archived scenario")
                 count=c.execute("SELECT count(*) AS n FROM runs WHERE workspace_id=%s AND status IN ('queued','running','cancelling')",(w,)).fetchone()["n"]
                 if count>=self.max_workspace_pending: raise QuotaExceeded("workspace pending run limit")
-                manifest=build_manifest(r["config"],seed,self.engine_version,str(sid),revision,algorithm)
+                manifest=build_manifest(r["config"],seed,self.engine_version,str(sid),revision,algorithm,mode)
                 if manifest["config_hash"]!=r["config_hash"]: raise Conflict("revision hash mismatch")
                 rid=uuid4()
                 c.execute("INSERT INTO runs(workspace_id,id,scenario_id,revision,algorithm,seed,mode,engine_version,manifest,manifest_hash,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(w,rid,sid,revision,algorithm,seed,mode,self.engine_version,Jsonb(manifest),digest(manifest),p.user_id))
                 self._audit(c,w,p.user_id,"run.enqueued","run",rid)
-                return {"run_id":str(rid),"status":"queued"}
+                return {"run_id":str(rid),"status":"queued","response":run_view(self._get_run(c,w,rid))}
             return self._idem(c,p,w,"enqueue",key,body,202,create)
 
     def _get_run(self,c,w,rid,lock=False):
@@ -176,7 +179,7 @@ class Repository:
                 elif status!="cancelling":
                     raise Conflict("terminal run")
                 self._audit(c,w,p.user_id,"run.cancel_requested","run",rid)
-                return {"run_id":str(rid),"status":status}
+                return {"run_id":str(rid),"status":status,"response":run_view(self._get_run(c,w,rid))}
             return self._idem(c,p,w,"cancel:"+str(rid),key,{},202,change)
 
     # Worker-only methods below. No user-supplied lease token is accepted by HTTP.
@@ -217,6 +220,11 @@ class Repository:
         if events:
             with c.cursor() as cur:
                 cur.executemany("INSERT INTO run_events(workspace_id,run_id,seq,tick,event_type,schema_version,payload) VALUES (%s,%s,%s,%s,%s,%s,%s)",[(lease.workspace_id,lease.run_id,e["seq"],e["tick"],e["type"],e["schema_version"],Jsonb(e["payload"])) for e in events])
+            for e in events:
+                if e["type"] in ("command.applied","command.rejected"):
+                    p=e["payload"]; applied=e["type"]=="command.applied"
+                    updated=c.execute("UPDATE run_commands SET status=%s,applied_tick=%s,rejection_reason=%s WHERE workspace_id=%s AND run_id=%s AND command_seq=%s AND status='queued'",("applied" if applied else "rejected",p["applied_tick"] if applied else None,None if applied else p["reason"],lease.workspace_id,lease.run_id,p["command_seq"]))
+                    if updated.rowcount!=1:raise Conflict("command state mismatch")
             if snapshot is not None:
                 if snapshot["run_id"]!=str(lease.run_id) or snapshot["seq"]!=seq or snapshot["tick"]<tick:
                     raise Conflict("snapshot cursor mismatch")
@@ -224,6 +232,13 @@ class Repository:
                 tick=snapshot["tick"]
             c.execute("UPDATE runs SET last_seq=%s,last_tick=%s WHERE workspace_id=%s AND id=%s",(seq,tick,lease.workspace_id,lease.run_id))
         return seq
+
+    def pending_commands(self,lease):
+        with self.connect() as c:
+            r=self._fence(c,lease)
+            if r["status"]=="cancelling":raise CancelRequested()
+            if r["mode"]!="interactive":raise Conflict("scripted run")
+            return c.execute("SELECT command_seq,payload FROM run_commands WHERE workspace_id=%s AND run_id=%s AND status='queued' ORDER BY command_seq LIMIT 20",(lease.workspace_id,lease.run_id)).fetchall()
 
     def commit_batch(self,lease,events,snapshot):
         with self.connect() as c:
@@ -244,6 +259,7 @@ class Repository:
             self._terminal(c,lease,"succeeded")
 
     def _terminal(self,c,lease,status,code=None):
+        c.execute("UPDATE run_commands SET status='rejected',rejection_reason='run_ended_before_application' WHERE workspace_id=%s AND run_id=%s AND status='queued'",(lease.workspace_id,lease.run_id))
         c.execute("UPDATE runs SET status=%s,finished_at=clock_timestamp(),failure_code=%s,worker_id=NULL,lease_token=NULL,lease_until=NULL WHERE workspace_id=%s AND id=%s",(status,code,lease.workspace_id,lease.run_id))
 
     def finish_cancel(self,lease):
@@ -261,4 +277,5 @@ class Repository:
         with self.connect() as c:
             result=c.execute("""UPDATE runs SET status='failed',failure_code='worker_lost',finished_at=clock_timestamp(),worker_id=NULL,lease_token=NULL,lease_until=NULL
                 WHERE status IN ('running','cancelling') AND lease_until<=clock_timestamp()""")
+            c.execute("UPDATE run_commands q SET status='rejected',rejection_reason='worker_lost' FROM runs r WHERE q.workspace_id=r.workspace_id AND q.run_id=r.id AND q.status='queued' AND r.status='failed' AND r.failure_code='worker_lost'")
             return result.rowcount

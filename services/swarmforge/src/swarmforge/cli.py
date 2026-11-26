@@ -41,6 +41,7 @@ def main():
             original=json.loads(args.result.read_text())
             if original["manifest"]["engine_version"]!=args.engine_version:
                 parser.error("engine version mismatch")
+            if original["manifest"]["mode"]!="scripted":parser.error("interactive runs support event-log playback, not scripted replay")
             actual=Simulation(original["manifest"]).run()
             expected=original["metrics"]["trace_hash"]
             if expected!=semantic_digest(original["events"]) or expected!=actual["metrics"]["trace_hash"] or original["metrics"]!=actual["metrics"]:

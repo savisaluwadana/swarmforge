@@ -107,9 +107,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [],
@@ -208,9 +205,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -319,9 +313,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -458,9 +449,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -589,9 +577,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -710,9 +695,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -830,9 +812,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -960,9 +939,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1099,9 +1075,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1239,9 +1212,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1369,9 +1339,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1521,13 +1488,10 @@
           "Runs"
         ],
         "summary": "Queue simulation run",
-        "description": "Queue simulation run",
+        "description": "Queue scripted or interactive simulation. Interactive runs limited to 300 logical ticks and paced at 100 ms wall time per tick; actual applied commands are recorded. Scripted replay only.",
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1656,9 +1620,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1776,9 +1737,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1906,9 +1864,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2026,9 +1981,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2156,9 +2108,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2298,9 +2247,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2434,13 +2380,10 @@
           "Runs"
         ],
         "summary": "Queue fault in running interactive simulation",
-        "description": "Reject scripted or terminal run, invalid target, or conflicting fault. Command applies at worker tick boundary; robot_crash duration must be null.",
+        "description": "Queue an interactive simulation fault (20 commands/run). Worker validates against existing faults and applies at next sampled logical tick; status persisted with events. Scripted or terminal runs return 409.",
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2576,9 +2519,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2717,9 +2657,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2837,9 +2774,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2975,9 +2909,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3105,9 +3036,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3236,9 +3164,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3356,9 +3281,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3497,9 +3419,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3627,9 +3546,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3747,9 +3663,6 @@
         "security": [
           {
             "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3880,11 +3793,6 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer"
-      },
-      "sessionCookie": {
-        "type": "apiKey",
-        "in": "cookie",
-        "name": "swarmforge_session"
       }
     },
     "schemas": {

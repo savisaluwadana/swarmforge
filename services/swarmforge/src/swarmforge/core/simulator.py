@@ -3,7 +3,7 @@ from hashlib import sha256
 from statistics import median
 from uuid import UUID, uuid5, NAMESPACE_URL
 from swarmforge import __version__
-from swarmforge.domain.model import Robot,Task,TaskSpec,validate_config,xy,integer
+from swarmforge.domain.model import Robot,Task,TaskSpec,validate_config,xy,integer,InvalidScenario
 from swarmforge.core.trace import Trace,digest,semantic_digest
 from swarmforge.motion.grid import plan,resolve
 from swarmforge.network.emulator import Network, Message
@@ -12,10 +12,12 @@ from swarmforge.policies.centralized import CentralizedGreedy
 from swarmforge.policies.local import PeerAuction
 
 
-def build_manifest(config, seed, engine_version=__version__, scenario_id=None, revision=1, algorithm="centralized_greedy"):
+def build_manifest(config, seed, engine_version=__version__, scenario_id=None, revision=1, algorithm="centralized_greedy", mode="scripted"):
     if algorithm not in ("centralized_greedy","local_auction","scoped_lease"):
         raise NotImplementedError("unsupported algorithm: "+str(algorithm))
     validate_config(config)
+    if mode not in ("scripted","interactive") or (mode=="interactive" and config["duration_ticks"]>300):
+        raise ValueError("interactive mode limited to 300 logical ticks")
     integer(seed,0,2147483647,"/seed")
     integer(revision,1,2147483647,"/revision")
     config = deepcopy(config)
@@ -25,20 +27,22 @@ def build_manifest(config, seed, engine_version=__version__, scenario_id=None, r
             "dependency_lock_hash":sha256(b"swarmforge-core-runtime:stdlib-only:v1").hexdigest(),
             "scenario_id":sid,"revision":revision,"config_hash":ch,"config":config,
             "algorithm":algorithm,"policy_parameters":{"heartbeat_timeout_ticks":3,"path_horizon":32,"grant_expiry":"scope_expiry" if algorithm=="scoped_lease" else "run_end","auction_ticks":3 if algorithm!="centralized_greedy" else 0,"workload_source":"common_predeclared_local_release_v1"},
-            "seed":seed,"mode":"scripted"}
+            "seed":seed,"mode":mode}
 
 
 class Simulation:
     def __init__(self, manifest, run_id=None):
         self.manifest = deepcopy(manifest)
-        if manifest["algorithm"] not in ("centralized_greedy","local_auction","scoped_lease") or manifest["mode"] != "scripted":
-            raise NotImplementedError("only the three scripted coordination policies supported")
+        if manifest["algorithm"] not in ("centralized_greedy","local_auction","scoped_lease") or manifest["mode"] not in ("scripted","interactive"):
+            raise NotImplementedError("unsupported policy or mode")
         config = self.manifest["config"]
-        expected = build_manifest(config,manifest["seed"],manifest["engine_version"],manifest["scenario_id"],manifest["revision"],manifest["algorithm"])
+        expected = build_manifest(config,manifest["seed"],manifest["engine_version"],manifest["scenario_id"],manifest["revision"],manifest["algorithm"],manifest["mode"])
         if self.manifest != expected:
             raise ValueError("manifest does not match supported configuration and policy")
         self.grid = validate_config(config)
         self.duration = config["duration_ticks"]
+        self.faults=deepcopy(config["faults"])
+        self.command_seen=set()
         self.run_id = str(UUID(run_id)) if run_id else str(uuid5(NAMESPACE_URL,"swarmforge:run:"+digest(manifest)))
         self.trace = Trace(self.run_id)
         self.robots = {r["id"]:Robot(r["id"],(r["start"]["x"],r["start"]["y"]),r["zone"]) for r in config["robots"]}
@@ -62,14 +66,36 @@ class Simulation:
         self.stale += 1
         self.trace.emit("authority.rejected",task_id=tid,robot_id=r.id,epoch=epoch,reason=reason)
 
+    def apply_commands(self,tick,commands):
+        for command in sorted(commands,key=lambda c:c["command_seq"]):
+            seq=command["command_seq"]
+            if seq in self.command_seen:continue
+            self.command_seen.add(seq)
+            try:
+                if self.manifest["mode"]!="interactive":raise ValueError("scripted run")
+                body=deepcopy(command["payload"])
+                length=body.pop("duration_ticks")
+                if length is not None and (type(length) is not int or length<=0):
+                    raise ValueError("invalid duration")
+                if body["type"]=="robot_crash" and length is not None:
+                    raise ValueError("robot crash must be permanent")
+                body["start_tick"]=tick
+                body["end_tick"]=None if length is None else min(self.duration,tick+length)
+                candidate={**self.manifest["config"],"faults":[*self.faults,body]}
+                validate_config(candidate)
+                self.faults.append(body)
+                self.trace.emit("command.applied",command_seq=seq,fault_id=f"f{len(self.faults)}",applied_tick=tick,fault=body)
+            except (InvalidScenario,ValueError,KeyError,TypeError) as exc:
+                self.trace.emit("command.rejected",command_seq=seq,reason=str(exc)[:512])
+
     def apply_faults(self,tick):
-        for i,f in enumerate(self.manifest["config"]["faults"]):
+        for i,f in enumerate(self.faults):
             fid=f"f{i+1}"
             targets=[f["robot_id"]] if f["type"]=="robot_crash" else ["C"] if f["type"]=="controller_outage" else f["links"]
             if f["end_tick"] == tick:
                 self.network.active.pop(fid,None)
                 self.trace.emit("network.fault_ended",fault_id=fid,fault_type=f["type"],targets=targets)
-        for i,f in enumerate(self.manifest["config"]["faults"]):
+        for i,f in enumerate(self.faults):
             if f["start_tick"] != tick:
                 continue
             fid=f"f{i+1}"
@@ -354,7 +380,7 @@ class Simulation:
                 if score is not None:
                     self.network.send(tick,rid,m.sender,"bid",{"task_id":b["task_id"],"round":b["round"],"score":score})
 
-    def run(self, checkpoint=None):
+    def run(self, checkpoint=None, command_source=None):
         """Optional observer receives state and trace at completed tick boundaries.
 
         Observer is outside policy logic; it may abort execution, never mutate inputs.
@@ -362,6 +388,10 @@ class Simulation:
         """
         if self.started:
             raise RuntimeError("simulation already executed")
+        if self.manifest["mode"]=="interactive" and command_source is None:
+            raise ValueError("interactive execution requires an explicit command source")
+        if self.manifest["mode"]=="scripted" and command_source is not None:
+            raise ValueError("scripted execution cannot accept commands")
         self.started=True
         self.local_completed=set()
         self.trace.emit("run.started",manifest_hash=digest(self.manifest),engine_version=self.manifest["engine_version"])
@@ -370,6 +400,8 @@ class Simulation:
             checkpoint(initial,self.trace.events)
         for tick in range(self.duration):
             self.trace.tick=tick
+            if command_source is not None:
+                self.apply_commands(tick,command_source(tick))
             self.apply_faults(tick)
             self.expire_scopes(tick)
             self.expire_robot_grants(tick)

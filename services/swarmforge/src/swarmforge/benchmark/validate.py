@@ -60,10 +60,11 @@ def audit(result,contract=None):
     counts=Counter(); completion_ticks=[]; bytes_sent=0; duplicates=0; collisions=0; active_ticks=0; available_ticks=0
     task_specs={t["id"]:t for t in c["tasks"]}
     disabled={(l["from"],l["to"]) for l in c["network"]["links"] if l.get("enabled") is False}
+    effective_faults=list(c["faults"]);command_ids=set()
     def blocked(sender,receiver,tick):
         if (sender,receiver) in disabled or sender in failed or receiver in failed:
             return True
-        for f in c["faults"]:
+        for f in effective_faults:
             if f["start_tick"]<=tick and (f["end_tick"] is None or tick<f["end_tick"]):
                 if f["type"]=="controller_outage" and "C" in (sender,receiver):
                     return True
@@ -85,7 +86,15 @@ def audit(result,contract=None):
             last=tick
             if contract: contract.event(e)
             p=e["payload"]; k=e["type"]; counts[k]+=1
-            if k=="robot.failed":
+            if k in ("command.applied","command.rejected"):
+                check(m["mode"]=="interactive" and p["command_seq"] not in command_ids,"invalid or duplicate command")
+                command_ids.add(p["command_seq"])
+                if k=="command.applied":
+                    fault=p["fault"]
+                    check(p["applied_tick"]==tick==fault["start_tick"] and p["fault_id"]==f"f{len(effective_faults)+1}","command applied tick or id mismatch")
+                    effective_faults.append(fault)
+                    validate_config({**c,"faults":effective_faults})
+            elif k=="robot.failed":
                 failed.add(p["robot_id"])
             elif k=="robot.moved":
                 rid=p["robot_id"]; a=(p["from"]["x"],p["from"]["y"]); b=(p["to"]["x"],p["to"]["y"])
