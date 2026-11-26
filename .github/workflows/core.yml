@@ -1,0 +1,28 @@
+name: Deterministic core
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile
+        run: python -m compileall -q services/swarmforge/src
+      - name: Unit and randomized invariant tests
+        run: make test PYTHON=python
+      - name: Run measured smoke experiment
+        run: make demo PYTHON=python
+      - name: Verify deterministic replay
+        run: make replay PYTHON=python
+      - uses: actions/upload-artifact@v4
+        with:
+          name: centralized-smoke
+          path: artifacts/demo.json

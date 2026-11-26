@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "width": 12,
+  "height": 8,
+  "obstacles": [
+    {
+      "x": 5,
+      "y": 3
+    }
+  ],
+  "robots": [
+    {
+      "id": "r1",
+      "start": {
+        "x": 1,
+        "y": 1
+      },
+      "zone": "west"
+    },
+    {
+      "id": "r2",
+      "start": {
+        "x": 8,
+        "y": 1
+      },
+      "zone": "east"
+    }
+  ],
+  "zones": [
+    {
+      "id": "west",
+      "min_x": 0,
+      "max_x": 5,
+      "min_y": 0,
+      "max_y": 7,
+      "leader": "r1"
+    },
+    {
+      "id": "east",
+      "min_x": 6,
+      "max_x": 11,
+      "min_y": 0,
+      "max_y": 7,
+      "leader": "r2"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "pickup": {
+        "x": 1,
+        "y": 2
+      },
+      "dropoff": {
+        "x": 4,
+        "y": 5
+      },
+      "release_tick": 0,
+      "priority": 5
+    },
+    {
+      "id": "t2",
+      "pickup": {
+        "x": 8,
+        "y": 2
+      },
+      "dropoff": {
+        "x": 9,
+        "y": 5
+      },
+      "release_tick": 6,
+      "priority": 5
+    }
+  ],
+  "network": {
+    "default_delay_ticks": 1,
+    "default_drop_rate": 0,
+    "links": []
+  },
+  "faults": [
+    {
+      "type": "controller_outage",
+      "start_tick": 5,
+      "end_tick": 20
+    }
+  ],
+  "duration_ticks": 50,
+  "tick_ms": 1000,
+  "scope_lease_ticks": 40
+}
