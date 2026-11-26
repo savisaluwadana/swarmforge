@@ -24,7 +24,8 @@ class ScopeLedger:
         self.grants = {}
         self.grids = {}
         self.task_zone = {}
-        expires = min(config["duration_ticks"], config["scope_lease_ticks"])
+        self.lease_ticks=config["scope_lease_ticks"]
+        expires = min(config["duration_ticks"], self.lease_ticks)
         for z in sorted(config["zones"], key=lambda z:z["id"]):
             zone = z["id"]
             members = tuple(sorted(r["id"] for r in config["robots"] if r["zone"] == zone))
@@ -39,6 +40,14 @@ class ScopeLedger:
                 if g.free(p) and g.free(q) and g.reachable(p,q):
                     self.task_zone[t["id"]] = zone
                     break
+
+    def renew(self,zone,tick,duration):
+        old=self.grants[zone]
+        if tick<old.expires_tick or tick>=duration:
+            raise ValueError("scope renewal outside allowed interval")
+        fresh=ScopeGrant(zone,old.leader,old.epoch+1,min(duration,tick+self.lease_ticks),old.members)
+        self.grants[zone]=fresh
+        return fresh
 
     def permits(self,tick,task_id,issuer,holder,scope_epoch):
         zone = self.task_zone.get(task_id)
@@ -70,7 +79,9 @@ class ZoneAuction:
         for m in inbox:
             b = m.body
             if m.kind == "scope" and m.sender == "C" and b["scope_id"] == self.scope.zone:
-                if b["epoch"] == self.scope.epoch and tick < b["expires_tick"]:
+                if (self.token is None or b["epoch"]>=self.token["epoch"]) and tick < b["expires_tick"]:
+                    if self.token is None or b["epoch"]>self.token["epoch"]:
+                        self.rounds.clear()
                     self.token = b
             elif m.kind == "bid":
                 rnd = self.rounds.get(b["task_id"])

@@ -33,6 +33,7 @@ class ScopedTests(unittest.TestCase):
     def test_expired_scope_fences_actions(self):
         c=fixture()
         c["scope_lease_ticks"]=8
+        c["faults"]=[{"type":"controller_outage","start_tick":5,"end_tick":None}]
         r=self.run_scoped(c)
         self.assertFalse(any(e["tick"]>=8 and e["type"] in ("task.picked","task.completed","robot.moved") for e in r["events"]))
         self.assertTrue(any(e["type"]=="authority.expired" for e in r["events"]))

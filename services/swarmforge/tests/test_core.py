@@ -105,7 +105,7 @@ class CoreTests(unittest.TestCase):
 
     def test_unsupported_policy_fails_closed(self):
         m=build_manifest(fixture(),0)
-        m["algorithm"]="local_auction"
+        m["algorithm"]="unsupported"
         with self.assertRaises(NotImplementedError):
             Simulation(m)
 

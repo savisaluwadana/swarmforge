@@ -34,3 +34,6 @@ Implemented fixed initial scope leases delivered through the network, local zone
 
 ## R0 — MVP release roadmap amendment (proposed)
 PR #3 merged; verified main commit at planning: 9f2590463675e6d7143937d5623f374e2589bdd5. New documentation defines eight planned PRs including R0, bounded agent gateway and MCP as P0, approval and evidence workflow, customer demo, research fairness correction and pass/fail release gates. No runtime code or tests changed by R0. Original REST OpenAPI/SQL unchanged; additive agent contracts and migration must be implemented in R6. Next R1: standalone auction, common workload-source model, renewal/reconciliation and safe deferral; do not begin backend before core correctness gates.
+
+## R1 — three-policy core and conservative recovery (proposed code)
+Added peer-local auction, aligned bid windows, shared predeclared release model, accepted-claim/completion propagation, fixed leader scope renewal after delivered request, expiry fencing and exact expired unpicked holder evidence reconciliation. Added replay, conflict, renewal and recovery tests. Both centralized and peer task grants still expire at run end; lost holder evidence or crashed/stranded tasks are not automatically reassigned. CI pending verification. No benchmarking superiority claim. R2 remains blocked until actual CI and review of model limitations.

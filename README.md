@@ -58,3 +58,12 @@ Runs the same two-robot fixture with fixed, predelegated scope authority and loc
 - [Verified progress](docs/progress.md)
 
 The release target is a functional agent-assisted robotics reliability lab with manual and approved agent-driven experiments. MCP and agent gateway are not implemented yet. No physical robot control.
+
+## R1 three-policy core (v0.3)
+```bash
+make test
+make demo && make replay
+make demo-auction && make replay-auction
+make demo-scoped && make replay-scoped
+```
+The CLI supports three scripted policies. The peer auction is a simplified baseline, and scoped renewal/reassignment are conservative. See docs/coordination.md and docs/progress.md. Web/API/MCP remain planned.
