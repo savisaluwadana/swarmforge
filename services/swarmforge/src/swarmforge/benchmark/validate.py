@@ -1,5 +1,7 @@
 """Validate canonical contract plus independently reconstruct safety evidence."""
 from collections import Counter
+from statistics import median
+from math import isclose
 from itertools import groupby
 from pathlib import Path
 import json
@@ -140,8 +142,18 @@ def audit(result,contract=None):
              "messages_sent":len(messages),"messages_delivered":counts["network.message_delivered"],
              "messages_dropped":counts["network.message_dropped"],"messages_in_flight":len(messages)-len(final_messages),
              "accepted_duplicates":duplicates,"actual_collisions":collisions,"stale_rejections":counts["authority.rejected"]}
+    lat=sorted(tick-releases[tid] for tid,tick in completed.items())
+    due=[t for t in task_specs.values() if t.get("due_tick") is not None and t["due_tick"]<=duration]
+    missed=sum(t["id"] not in completed or completed[t["id"]]>t["due_tick"] for t in due)
+    derived.update(completion_rate=len(completed)/len(releases) if releases else None,
+                   throughput_tasks_per_minute=len(completed)*60000/(duration*c["tick_ms"]),
+                   latency_p50_ticks=median(lat) if lat else None,
+                   latency_p95_ticks=lat[(95*len(lat)+99)//100-1] if lat else None,
+                   deadline_miss_rate=missed/len(due) if due else None,
+                   messages_per_completion=len(messages)/len(completed) if completed else None)
     for k,v in derived.items():
-        check(metrics[k]==v,f"metric mismatch: {k} expected {v}, got {metrics[k]}")
+        actual=metrics[k]
+        check(actual==v or (isinstance(actual,(int,float)) and isinstance(v,(int,float)) and isclose(actual,v,rel_tol=1e-12,abs_tol=1e-12)),f"metric mismatch: {k} expected {v}, got {actual}")
     check(duplicates==0 and collisions==0,"trace safety violation")
     check(len(releases)==len(task_specs),"missing scheduled releases")
     check(result["final_snapshot"]["seq"]==len(events),"snapshot cursor mismatch")

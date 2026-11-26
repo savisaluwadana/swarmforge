@@ -104,12 +104,23 @@ def run_suite(suite,output,contracts,engine_version=__version__,runner=None,repl
         if r["status"]!="succeeded" or r["condition"]=="healthy": continue
         baseline=healthy.get((r["seed"],r["algorithm"]))
         f=scenario(r["condition"],r["seed"])["faults"][0]
-        value,status=recovery(r["evidence"]["completion_ticks"],baseline["evidence"]["completion_ticks"],f["end_tick"],100) if baseline else (None,"missing_baseline")
+        # The skew/cross-zone control changes task placement and has no matched healthy workload.
+        if r["condition"]=="skew_cross_zone":
+            value,status=None,"missing_matched_workload"
+        else:
+            value,status=recovery(r["evidence"]["completion_ticks"],baseline["evidence"]["completion_ticks"],f["end_tick"],100) if baseline else (None,"missing_baseline")
         r["metrics"]["recovery_ticks"]=value;r["metrics"]["recovery_status"]=status
     conditions=list(dict.fromkeys(r["condition"] for r in rows))
+    aggregates=[]
+    for condition in conditions:
+        for algorithm in POLICIES:
+            group=[r for r in rows if r["condition"]==condition and r["algorithm"]==algorithm]
+            for metric in METRICS:
+                values=[r["metrics"][metric] for r in group if r["status"]=="succeeded" and r["metrics"].get(metric) is not None]
+                aggregates.append({"condition":condition,"algorithm":algorithm,"metric":metric,"n":len(values),"missing_n":len(group)-len(values),"mean":mean(values) if values else None,"median":median(values) if values else None})
     comparisons=[paired(rows,c,m,a) for c in conditions for m in METRICS for a in POLICIES[1:]]
     report={"suite":suite,"engine_version":engine_version,"planned":len(plan),"succeeded":sum(r["status"]=="succeeded" for r in rows),
-            "failed":sum(r["status"]=="failed" for r in rows),"runs":rows,"comparisons":comparisons,
+            "failed":sum(r["status"]=="failed" for r in rows),"runs":rows,"aggregates":aggregates,"comparisons":comparisons,
             "limitations":["Synthetic grid model with replicated predeclared task input; no physical safety or novelty claim.",
             "Latency is conditional on completed tasks; survivor bias possible. Small paired samples descriptive only.",
             "Recovery uses full 20-tick post-heal windows; zero healthy reference is undefined; unrecovered nonzero reference is censored.",
@@ -118,6 +129,7 @@ def run_suite(suite,output,contracts,engine_version=__version__,runner=None,repl
     for filename,data,columns in (
         ("runs.csv",[{**{k:v for k,v in r.items() if k not in ("metrics","evidence")},**{k:r.get("metrics",{}).get(k) for k in METRICS}} for r in rows],
          ["condition","seed","algorithm","status","manifest_hash","config_hash","trace_hash","replay_verified","artifact","error",*METRICS]),
+        ("aggregates.csv",aggregates,["condition","algorithm","metric","n","missing_n","mean","median"]),
         ("comparisons.csv",comparisons,["condition","metric","candidate","baseline","matched_n","missing_n","mean_difference","median_difference","ci95_low","ci95_high"])):
         with (output/filename).open("w",newline="") as f:
             w=csv.DictWriter(f,fieldnames=columns,extrasaction="ignore");w.writeheader();w.writerows(data)

@@ -29,6 +29,11 @@ class BenchmarkTests(unittest.TestCase):
         r["metrics"]["completed"]+=1
         with self.assertRaises(EvidenceError):audit(r)
 
+    def test_latency_tamper_detected(self):
+        r=simulate(fixture(),42)
+        r["metrics"]["latency_p50_ticks"]+=1
+        with self.assertRaises(EvidenceError):audit(r)
+
     def test_invalid_payload_detected(self):
         from jsonschema import ValidationError
         r=simulate(fixture(),42)
