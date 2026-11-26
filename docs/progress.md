@@ -64,3 +64,10 @@ R5 review follow-up: handle SSE before first snapshot with initial scenario coor
 
 ### R5 browser failure and corrective change
 CI 45783116219: build, projections, real service startup and mobile/keyboard test passed; main browser journey reached benchmark scenario selection after interactive command application, replay and JSON download, but timed out locating exact label `Scenario`. The benchmark form now gives scenario/revision controls explicit accessible names, blocks launch until the selected revision belongs to the selected scenario, and the browser test verifies navigation and loaded option before selecting. Latest core and persistence regressions on dca3788 passed. Corrective commit requires fresh browser acceptance; no claim of complete R5 yet.
+
+## R6 — agent gateway and MCP increment
+PR #9 final web/core/PostgreSQL checks all green (45783787293/45783787283/45783787301). Added agent tables, typed plan/decision/execution APIs, shared enqueue transaction, separate exact approval, local stateless MCP SDK and 13 tools, deterministic report, optional budget-gated model adapter and Agent Console. Real PostgreSQL/API/MCP integration tests pending. No external OAuth, live paid provider verification, LLM-generated evidence narrative or production step-up. R6 not complete until tests and review.
+
+Initial R6 code commit 70c2515 passed PostgreSQL/API/agent integration CI 45785571468 (9+6+5 tests). Follow-up 6e0c7f5 restricts MCP credentials; browser/official client checks added. Verify all latest workflows before merge.
+
+R6 evidence refinement: reports include actual bounded event observations with run ID, sequence and tick; tests resolve each reference back to the stored trace. Official SDK client acceptance now drafts a plan, verifies unapproved denial, approves via separate REST credential, executes two real runs, polls and retrieves persisted evidence. Credential-isolation commit 6e0c7f5 passed PostgreSQL/API/agent CI 45785730370. Latest checks required.

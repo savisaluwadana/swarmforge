@@ -36,5 +36,16 @@ test("real scenario, worker, evidence and benchmark",async({page})=>{
  await expect(page.locator(".heading .status")).toHaveText("succeeded",{timeout:60000});
  await expect(page.getByText("Successful",{exact:true})).toBeVisible();
  await page.screenshot({path:"test-results/benchmark.png",fullPage:true});
+ await page.getByRole("link",{name:"Agent console"}).click();
+ await expect(page.getByRole("heading",{name:"Describe the reliability question"})).toBeVisible();
+ await page.getByRole("combobox",{name:"Base scenario"}).selectOption({label:"Warehouse / controller outage"});
+ await page.getByLabel("Manual random seeds").fill("11");
+ await page.getByRole("button",{name:"Draft without AI"}).click();
+ await expect(page.getByRole("heading",{name:"Review experiment plan"})).toBeVisible();
+ await page.getByLabel("Separate human approval credential").fill(process.env.AGENT_APPROVAL_SECRET);
+ await page.getByRole("button",{name:"Approve exact plan"}).click();
+ await page.getByRole("button",{name:"Execute approved plan"}).click();
+ await expect(page.getByRole("heading",{name:"Persisted execution handles"})).toBeVisible();
+ await page.screenshot({path:"test-results/agent.png",fullPage:true});
 });
 test("mobile landing and keyboard access",async({page})=>{await page.setViewportSize({width:390,height:844});await page.goto("/");await page.keyboard.press("Tab");await expect(page.locator(":focus")).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy()});

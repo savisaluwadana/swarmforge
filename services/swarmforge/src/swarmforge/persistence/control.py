@@ -105,6 +105,14 @@ class ControlRepository(Repository):
         status=("failed" if failed else "cancelled" if cancelled else "succeeded") if terminal==total else "queued" if counts.get("queued",0)==total else "running"
         return {**select(b,"id scenario_id revision algorithms seeds engine_version created_at"),"status":status,"total_runs":total,"terminal_runs":terminal,"successful_runs":ok,"failed_runs":failed,"cancelled_runs":cancelled}
 
+    def _enqueue_case(self,c,p,w,sid,revision,algorithms,seeds,config,config_hash):
+        bid=None
+        if len(algorithms)>1:
+            bid=uuid4()
+            c.execute("INSERT INTO benchmarks(workspace_id,id,scenario_id,revision,algorithms,seeds,engine_version,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",(w,bid,sid,revision,Jsonb(algorithms),Jsonb(seeds),self.engine_version,p.user_id))
+        ids=[str(self._insert_run(c,p,w,sid,revision,a,s,config,config_hash,benchmark_id=bid)) for a in algorithms for s in seeds]
+        return {"benchmark_id":str(bid) if bid else None,"run_ids":ids}
+
     def create_benchmark(self,p,w,sid,revision,algorithms,seeds,key):
         total=len(algorithms)*len(seeds)
         if not 2<=len(algorithms)<=3 or not 1<=len(seeds)<=60 or total>120 or len(set(algorithms))!=len(algorithms) or len(set(seeds))!=len(seeds):
@@ -118,13 +126,7 @@ class ControlRepository(Repository):
                 if r["archived_at"]:raise Conflict("archived scenario")
                 n=c.execute("SELECT count(*) AS n FROM runs WHERE workspace_id=%s AND status IN ('queued','running','cancelling')",(w,)).fetchone()["n"]
                 if n+total>self.max_workspace_pending:raise QuotaExceeded("workspace pending run limit")
-                bid=uuid4()
-                c.execute("INSERT INTO benchmarks(workspace_id,id,scenario_id,revision,algorithms,seeds,engine_version,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",(w,bid,sid,revision,Jsonb(algorithms),Jsonb(seeds),self.engine_version,p.user_id))
-                for alg in algorithms:
-                    for seed in seeds:
-                        m=build_manifest(r["config"],seed,self.engine_version,str(sid),revision,alg)
-                        if m["config_hash"]!=r["config_hash"]:raise Conflict("revision hash mismatch")
-                        c.execute("INSERT INTO runs(workspace_id,scenario_id,revision,benchmark_id,algorithm,seed,mode,engine_version,manifest,manifest_hash,created_by) VALUES (%s,%s,%s,%s,%s,%s,'scripted',%s,%s,%s,%s)",(w,sid,revision,bid,alg,seed,self.engine_version,Jsonb(m),digest(m),p.user_id))
+                bid=UUID(self._enqueue_case(c,p,w,sid,revision,algorithms,seeds,r["config"],r["config_hash"])["benchmark_id"])
                 self._audit(c,w,p.user_id,"benchmark.enqueued","benchmark",bid)
                 return self._benchmark_view(c,self._benchmark(c,w,bid))
             return self._idem(c,p,w,"benchmark.create",key,body,202,create)

@@ -1,8 +1,9 @@
 import {decodeFrame} from "./model.mjs";
-export async function request(token,path,{method="GET",body,key,signal,raw=false}={}){
+export async function request(token,path,{method="GET",body,key,signal,raw=false,approvalSecret}={}){
  const headers={Authorization:"Bearer "+token};
  if(body!==undefined)headers["Content-Type"]="application/json";
  if(key)headers["Idempotency-Key"]=key;
+ if(approvalSecret)headers["X-Approval-Secret"]=approvalSecret;
  const r=await fetch("/api/control"+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,cache:"no-store"});
  if(!r.ok){const j=await r.json().catch(()=>({}));const e=Error(j.message||"Request failed ("+r.status+")");e.status=r.status;throw e}
  return raw?r:r.json();

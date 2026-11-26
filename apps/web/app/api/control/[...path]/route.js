@@ -7,7 +7,7 @@ async function proxy(request,{params}){
  const url=new URL("/"+path.join("/"),process.env.SWARMFORGE_API_URL||"http://127.0.0.1:8000");
  url.search=new URL(request.url).search;
  const headers=new Headers();
- for(const k of ["authorization","content-type","idempotency-key","last-event-id","accept"]){const v=request.headers.get(k);if(v)headers.set(k,v)}
+ for(const k of ["authorization","content-type","idempotency-key","last-event-id","accept","x-approval-secret"]){const v=request.headers.get(k);if(v)headers.set(k,v)}
  let body;
  if(request.method==="POST"){
   const reader=request.body?.getReader();let length=0;const chunks=[];
