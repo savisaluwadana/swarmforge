@@ -1,0 +1,22 @@
+# Research and benchmarking plan
+Do not claim performance or novel science until measured. Primary hypothesis: scoped_lease preserves more completed tasks during short partition/outage than centralized_greedy under same workload without accepted duplicate tasks or simulated collisions. Secondary: compare attempted conflicts, stale rejections, recovery time and messages per completion versus local_auction. Report failure to improve as valid outcome.
+
+## Experimental design
+Control: same map, starts, task releases, deadlines, network schedule, horizon, motion and arbiter across policies; only policy changes. Separate fixed exogenous random streams; stochastic link drops conditional on message attempts, report that algorithms send different traffic. Use paired seed list predeclared before running. Minimum smoke: 10 robots, 2 seeds, 3 policies, healthy and controller outage; 12 runs. Target competition matrix: 10/30/100 robots x healthy/short outage/long outage/partition/robot crash x 10 seeds x 3 policies =450 runs, split into benchmark batches <=120 and only if resources allow. Predeclare subset and report actual n, never substitute fabricated data. Include uneven zone demand and cross-zone tasks as negative controls; compare scope lease duration sensitivity (short vs long outage). Use same time budget/duration, no stopping early for successful algorithm; stop only invariant failure/cancel/resource limit, mark failed. Use independent repetitions if hardware wall time recorded; logical time primary. 
+Metrics:
+- completion_rate = completed/released (null when released=0); throughput = completed / (duration_ticks*tick_ms/60000) in tasks/min, null if duration=0.
+- latency = completion_tick - release_tick, median/p95 over completed tasks only, label survivor bias; deadline miss rate among released tasks with due_tick <= end, incomplete counts as miss.
+- recovery_ticks for a fault: from heal tick until rolling 20-tick completion rate reaches >=90% of matched healthy run's rate over same logical window; if baseline zero or no full window, undefined; if not achieved by end, censored. Also report time to first post-heal completion.
+- accepted_duplicate_actions and actual collisions must be 0 in valid runs; attempted conflicts and rejected stale tokens separate. Report stranded tasks and unresolved ownership.
+- messages_sent/delivered/dropped/in_flight, estimated bytes (canonical encoded payload + envelope), messages per completed task (null if zero).
+- utilization = moving/carrying ticks / total nonfailed robot ticks; explicitly label formula and denominator.
+- simulation execution wall time optional, excluded from semantic digest.
+Compute per seed metrics, mean/median, paired difference candidate - baseline, bootstrap 95% interval with seeded bootstrap (1000 resamples) only if >=5 matched pairs; smaller n descriptive only. Do not use unpaired means as causal evidence. Show all failed/cancelled counts and why. 
+## Reproduction
+Manifest: schema version, engine commit/image digest, dependencies lock hash, scenario ID/revision/config canonical hash, config, algorithm+params, seed, duration, tick_ms, mode. SHA-256 canonical sorted keys UTF-8 JSON with integer fields and normalized probabilities; define exact serializer and golden vectors; normalize negative zero, reject NaN/Infinity. Semantic event digest excludes run UUID, wall timestamps and transport frames, includes stable seq/tick/type/payload. Same build and inputs expected same digest, test in CI. Export raw events and metrics JSON; CSV one row per run/metric comparison. Document OS/runtime for wall benchmarks.
+## Acceptance gates
+- deterministic replay for all three algorithms on fixed fixtures; no hidden global policy view.
+- property tests: no duplicate accepted assignment/action, no invalid movement, no cross-link delivery during partition, stale authority rejected, crash carrying -> stranded, completed terminal, liveness only under valid assumptions.
+- metamorphic: no-fault equivalent network baseline; seed change changes randomized scenario only if randomness used; adding isolated component cannot deliver forbidden message.
+- Integration: queue leasing and stale worker fencing, cancellation, idempotency, tenant isolation, SSE reconnect, benchmark fanout and export.
+- Report explicitly marks synthetic inputs, simulated results, physical limitations and unresolved novelty.
