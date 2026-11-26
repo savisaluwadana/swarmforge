@@ -19,9 +19,19 @@ def main():
     replay=sub.add_parser("replay")
     replay.add_argument("result",type=Path)
     replay.add_argument("--engine-version",default=__version__)
+    bench=sub.add_parser("benchmark")
+    bench.add_argument("--suite",choices=["smoke","research"],default="smoke")
+    bench.add_argument("--output",type=Path,required=True)
+    bench.add_argument("--contracts",type=Path,default=Path("contracts"))
+    bench.add_argument("--engine-version",default=__version__)
     args=parser.parse_args()
     try:
-        if args.cmd=="run":
+        if args.cmd=="benchmark":
+            from swarmforge.benchmark.runner import run_suite
+            report=run_suite(args.suite,args.output,args.contracts,args.engine_version)
+            if report["failed"]:
+                parser.exit(1,"Benchmark includes failed runs; evidence preserved.\n")
+        elif args.cmd=="run":
             config=json.loads(args.scenario.read_text())
             result=Simulation(build_manifest(config,args.seed,args.engine_version,algorithm=args.algorithm)).run()
             args.output.parent.mkdir(parents=True,exist_ok=True)

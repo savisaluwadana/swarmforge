@@ -35,3 +35,5 @@ Every event has schema_version, run_id, seq, tick, type, payload (see OpenAPI Ev
 
 The renderer uses authoritative state from snapshots and applies committed events. If event type is not understood, request fresh snapshot and show compatibility error rather than guessing. Transport stream.closed is not part of engine history. 
 Digest: normalize event run_id away; include schema_version, seq, tick, type, payload; remove trace_hash field from run.finished before hashing. Hash canonical JSON lines with newline after each normalized event. Version canonicalization rules and add golden vectors. For progress events emitted at deterministic logical ticks, include them; any wall-clock-dependent transport progress must not be persisted as semantic event. 
+
+R2 adds machine-readable event-payloads.json ($defs keyed by event type). The benchmark validator checks these and the OpenAPI envelope; additional diagnostic keys remain allowed.

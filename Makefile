@@ -24,3 +24,10 @@ demo-auction:
 
 replay-auction:
 	$(PYTHON) -m swarmforge.cli replay artifacts/auction.json
+
+.PHONY: benchmark-smoke benchmark-research
+benchmark-smoke:
+	$(PYTHON) -m swarmforge.cli benchmark --suite smoke --output artifacts/benchmark-smoke --engine-version "$$(git rev-parse HEAD)"
+
+benchmark-research:
+	$(PYTHON) -m swarmforge.cli benchmark --suite research --output artifacts/benchmark-research --engine-version "$$(git rev-parse HEAD)"
