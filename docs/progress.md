@@ -56,3 +56,6 @@ Implemented bearer identity, local seeded auth and configured OIDC verification,
 R4 follow-up: implemented interactive run and fault-command application at tick boundaries with immutable initial manifest, typed applied fault event, transactional command status update and conservative rejection on overlap/invalid targets/end. Added end-to-end API/worker test for actual injected packet loss and command evidence. CI verification pending.
 
 Initial R4 API CI 45781789533: existing nine PostgreSQL tests passed; four API tests errored because the test helper named schema shadowed the isolated-schema attribute. Renamed helper; removed duplicate test discovery import. Retest required on updated interactive commit.
+
+## R5 — web lab implementation
+R4 final research CI 45782003481 verified successful. Next.js frontend with simulation-only landing, token connection, workspace dashboard, preset/validation/revision editor, canvas and accessible fleet ledger, live SSE and reconnection, interactive fault controls, bounded event replay, raw evidence inspector, measured run/benchmark metrics, paired comparisons, exports and Compose service. Browser tests against actual PostgreSQL/API/worker added; CI pending. Exact direct dependencies selected; transitive lockfile and visual review remain verification gates. No MCP or AI provider yet. No public deployment.
