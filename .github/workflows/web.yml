@@ -1,0 +1,77 @@
+name: Web laboratory
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: swarmforge
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: swarmforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U swarmforge -d swarmforge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://swarmforge:ci-only-password@127.0.0.1:5432/swarmforge_test
+      PYTHONPATH: services/swarmforge/src
+      ENGINE_VERSION: browser-ci
+      AUTH_MODE: local
+      LOCAL_DEMO_TOKEN: ci-local-test-token-not-a-production-secret-1234
+      SWARMFORGE_API_URL: http://127.0.0.1:8000
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend and migrate
+        run: |
+          python -m pip install -r services/swarmforge/requirements-persistence.txt
+          python -m swarmforge.persistence.migrate
+          python -m swarmforge.api.seed
+      - name: Install frontend and test projections
+        working-directory: apps/web
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          npm run build
+          npx playwright install --with-deps chromium
+      - name: Start actual services
+        run: |
+          nohup python -m uvicorn swarmforge.api.main:from_env --factory --host 127.0.0.1 --port 8000 > /tmp/api.log 2>&1 &
+          nohup python -m swarmforge.worker.main > /tmp/worker.log 2>&1 &
+          cd apps/web
+          nohup npm run start -- --hostname 127.0.0.1 > /tmp/web.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null && curl -fsS http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Browser end-to-end
+        working-directory: apps/web
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-evidence
+          path: |
+            apps/web/test-results/
+            apps/web/package-lock.json
+            /tmp/api.log
+            /tmp/worker.log
+            /tmp/web.log

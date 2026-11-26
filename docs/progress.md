@@ -56,3 +56,11 @@ Implemented bearer identity, local seeded auth and configured OIDC verification,
 R4 follow-up: implemented interactive run and fault-command application at tick boundaries with immutable initial manifest, typed applied fault event, transactional command status update and conservative rejection on overlap/invalid targets/end. Added end-to-end API/worker test for actual injected packet loss and command evidence. CI verification pending.
 
 Initial R4 API CI 45781789533: existing nine PostgreSQL tests passed; four API tests errored because the test helper named schema shadowed the isolated-schema attribute. Renamed helper; removed duplicate test discovery import. Retest required on updated interactive commit.
+
+## R5 — web lab implementation
+R4 final research CI 45782003481 verified successful. Next.js frontend with simulation-only landing, token connection, workspace dashboard, preset/validation/revision editor, canvas and accessible fleet ledger, live SSE and reconnection, interactive fault controls, bounded event replay, raw evidence inspector, measured run/benchmark metrics, paired comparisons, exports and Compose service. Browser tests against actual PostgreSQL/API/worker added; CI pending. Exact direct dependencies selected; transitive lockfile and visual review remain verification gates. No MCP or AI provider yet. No public deployment.
+
+R5 review follow-up: handle SSE before first snapshot with initial scenario coordinates and ordered events, preserve failed robot mode in projections, guard malformed editor data from renderer, and require terminal benchmark success in browser test. CI must verify updated code.
+
+### R5 browser failure and corrective change
+CI 45783116219: build, projections, real service startup and mobile/keyboard test passed; main browser journey reached benchmark scenario selection after interactive command application, replay and JSON download, but timed out locating exact label `Scenario`. The benchmark form now gives scenario/revision controls explicit accessible names, blocks launch until the selected revision belongs to the selected scenario, and the browser test verifies navigation and loaded option before selecting. Latest core and persistence regressions on dca3788 passed. Corrective commit requires fresh browser acceptance; no claim of complete R5 yet.

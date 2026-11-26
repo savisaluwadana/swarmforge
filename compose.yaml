@@ -49,5 +49,16 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      SWARMFORGE_API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_started
 volumes:
   pgdata:

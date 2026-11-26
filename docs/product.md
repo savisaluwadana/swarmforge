@@ -41,3 +41,6 @@ Sell simulation/reliability testing to integrators before operational control. V
 
 ## Agent-assisted use cases (proposed)
 UC11 engineer describes a fault goal in natural language -> typed plan preview, validation, exact run count, human approval, real run IDs. UC12 external MCP host discovers tools, drafts plan, directs user to trusted approval UI, executes approved plan and queries measured evidence; cross-workspace and unapproved execution rejected. UC13 investigator asks why a task stalled -> evidence references or explicit missing evidence. See mvp-release.md and agent-platform.md for acceptance criteria.
+
+## R5 frontend decisions
+Next.js App Router with same-origin fixed upstream proxy, in-memory bearer token, workspace selection, keyboard-accessible DOM controls and canvas map. Form edits and advanced JSON cover full config; fleet/task graphical editing beyond obstacle cells is deferred polish. Interactive commands use existing R4 API. Event projections show inferred modes between checkpoints; exact snapshots and raw evidence are authoritative. Terminal playback caps at 20,000 events; full export remains available. No agent console until R6. UI never presents preset inputs as measured results.

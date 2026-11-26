@@ -1,0 +1,24 @@
+{
+  "name": "swarmforge-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test tests/model.test.mjs",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
