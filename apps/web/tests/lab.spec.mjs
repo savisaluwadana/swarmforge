@@ -29,7 +29,7 @@ test("real scenario, worker, evidence and benchmark",async({page})=>{
  await page.getByLabel("Random seeds").fill("11");
  await page.getByRole("button",{name:"Launch benchmark · 3 runs"}).click();
  await expect(page.getByRole("heading",{name:"Measured policy comparison"})).toBeVisible();
- await expect(page.getByText("succeeded",{exact:true}).first()).toBeVisible({timeout:60000});
+ await expect(page.locator(".heading .status")).toHaveText("succeeded",{timeout:60000});
  await expect(page.getByText("Successful",{exact:true})).toBeVisible();
  await page.screenshot({path:"test-results/benchmark.png",fullPage:true});
 });

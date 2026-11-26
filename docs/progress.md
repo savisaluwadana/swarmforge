@@ -59,3 +59,5 @@ Initial R4 API CI 45781789533: existing nine PostgreSQL tests passed; four API t
 
 ## R5 — web lab implementation
 R4 final research CI 45782003481 verified successful. Next.js frontend with simulation-only landing, token connection, workspace dashboard, preset/validation/revision editor, canvas and accessible fleet ledger, live SSE and reconnection, interactive fault controls, bounded event replay, raw evidence inspector, measured run/benchmark metrics, paired comparisons, exports and Compose service. Browser tests against actual PostgreSQL/API/worker added; CI pending. Exact direct dependencies selected; transitive lockfile and visual review remain verification gates. No MCP or AI provider yet. No public deployment.
+
+R5 review follow-up: handle SSE before first snapshot with initial scenario coordinates and ordered events, preserve failed robot mode in projections, guard malformed editor data from renderer, and require terminal benchmark success in browser test. CI must verify updated code.

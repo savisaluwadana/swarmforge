@@ -11,7 +11,7 @@ export function applyEvent(s,e){
  if(e.seq!==s.seq+1)throw Error("Event cursor gap");
  const p=e.payload,k=e.type;
  let next={...s,seq:e.seq,tick:e.tick};
- const robot=(id,patch)=>{next.robots=next.robots.map(r=>r.id===id?{...r,...patch}:r)};
+ const robot=(id,patch)=>{next.robots=next.robots.map(r=>r.id===id?{...r,...patch,...(r.mode==="failed"?{mode:"failed"}:{})}:r)};
  const task=(id,patch)=>{next.tasks=next.tasks.map(t=>t.id===id?{...t,...patch}:t)};
  if(k==="robot.moved")robot(p.robot_id,{position:p.to});
  if(k==="robot.failed"){robot(p.robot_id,{mode:"failed"});next.network={...s.network,failed_nodes:[...new Set([...s.network.failed_nodes,p.robot_id])]} }
