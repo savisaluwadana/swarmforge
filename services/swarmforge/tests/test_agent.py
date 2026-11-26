@@ -16,8 +16,10 @@ class AgentTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from swarmforge.api.main import create_app
         test_api.APITests.setUp(self)
-        self.secret="h"*40
-        self.app=create_app(self.repo,self.auth,ROOT/"contracts",approval_secret=self.secret)
+        import secrets
+        self.secret=secrets.token_urlsafe(40)
+        self.mcp_token=secrets.token_urlsafe(40)
+        self.app=create_app(self.repo,self.auth,ROOT/"contracts",approval_secret=self.secret,mcp_token=self.mcp_token)
         self.client=TestClient(self.app,headers={"Authorization":"Bearer "+self.token})
         self.sid=test_api.APITests.scenario(self)
     assert_schema=test_api.APITests.assert_schema
@@ -70,7 +72,7 @@ class AgentTests(unittest.TestCase):
         with self.repo.connect() as c:self.assertEqual(c.execute("SELECT count(*) AS n FROM runs").fetchone()["n"],0)
     def test_mcp_transport_and_tool_execution(self):
         from fastapi.testclient import TestClient
-        with TestClient(self.app,headers={"Authorization":"Bearer "+self.token,"Accept":"application/json, text/event-stream","MCP-Protocol-Version":"2025-06-18"}) as c:
+        with TestClient(self.app,headers={"Authorization":"Bearer "+self.mcp_token,"Accept":"application/json, text/event-stream","MCP-Protocol-Version":"2025-06-18"}) as c:
             def rpc(method,params,i=1):
                 r=c.post("/mcp",json={"jsonrpc":"2.0","id":i,"method":method,"params":params})
                 self.assertEqual(r.status_code,200,r.text);return r.json()
@@ -85,5 +87,7 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(self.decide(p).status_code,200)
             ok=rpc("tools/call",{"name":"execute_approved_plan","arguments":args})["result"]
             self.assertFalse(ok.get("isError",False),ok);self.assertEqual(len(ok["structuredContent"]["run_ids"]),4)
+            self.assertEqual(c.get(self.prefix+"/runs").status_code,401)
+            self.assertEqual(c.post("/mcp",headers={"Authorization":"Bearer "+self.token},json={"jsonrpc":"2.0","id":2,"method":"tools/list"}).status_code,401)
             self.assertEqual(c.post("/mcp",headers={"Authorization":"Bearer wrong"},json={"jsonrpc":"2.0","id":2,"method":"tools/list"}).status_code,401)
             self.assertEqual(c.post("/mcp",headers={"Origin":"https://evil.example"},json={"jsonrpc":"2.0","id":2,"method":"tools/list"}).status_code,403)

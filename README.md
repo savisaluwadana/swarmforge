@@ -88,3 +88,5 @@ After setting local authentication and seeding as above, run `docker compose up 
 
 ## R6 agent preview
 Set distinct AGENT_APPROVAL_SECRET (random 32+ characters), never share with MCP client. In Agent Console choose saved scenario and draft without AI or configure optional HTTPS model and cost caps. Review immutable plan, approve with separate credential, execute once, inspect benchmark evidence. Local MCP endpoint http://127.0.0.1:8000/mcp uses bearer auth and official SDK Streamable HTTP. Draft via MCP, open returned /agent/{id} in web app, approve, execute via MCP. Remote OAuth not yet validated; no physical robot control.
+
+Set LOCAL_MCP_TOKEN independently from the REST credential and AGENT_APPROVAL_SECRET. Only give the MCP-specific credential to an external MCP host. Ordinary REST rejects it; MCP refuses the ordinary REST token.

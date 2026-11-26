@@ -34,7 +34,7 @@ def csv_response(rows,name):
     return Response(buf.getvalue(),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="{name}.csv"'})
 
 
-def create_app(repo,auth,contracts="contracts",provider=None,approval_secret=None):
+def create_app(repo,auth,contracts="contracts",provider=None,approval_secret=None,mcp_token=None):
     contract=json.loads((Path(contracts)/"openapi.json").read_text())
     registry=Registry().with_resource("urn:swarmforge:api",Resource.from_contents(contract,default_specification=DRAFT202012))
     def validate(name,value):
@@ -218,8 +218,9 @@ def create_app(repo,auth,contracts="contracts",provider=None,approval_secret=Non
     import hmac
     gateway=Gateway(repo,contracts);model=provider or Provider()
     secret=approval_secret if approval_secret is not None else os.getenv("AGENT_APPROVAL_SECRET","")
+    tool_token=mcp_token if mcp_token is not None else os.getenv("LOCAL_MCP_TOKEN","")
     def require_human(x_approval_secret:str|None=Header(None)):
-        if len(secret)<32 or secret==getattr(auth,"token",None) or not x_approval_secret or not hmac.compare_digest(secret.encode(),x_approval_secret.encode()):
+        if len(secret)<32 or secret in (getattr(auth,"token",None),tool_token) or not x_approval_secret or not hmac.compare_digest(secret.encode(),x_approval_secret.encode()):
             raise Forbidden("separate approval credential required")
     @app.post(prefix+"/agent/plans",status_code=201)
     def agent_draft(workspace_id:UUID,body:dict,k=Depends(key),p=Depends(principal)):
@@ -245,7 +246,7 @@ def create_app(repo,auth,contracts="contracts",provider=None,approval_secret=Non
     @app.get(prefix+"/agent/reports/{benchmark_id}")
     def agent_report(workspace_id:UUID,benchmark_id:UUID,p=Depends(principal)):
         return gateway.report(p,workspace_id,benchmark_id)
-    install(app,gateway,auth)
+    install(app,gateway,auth,tool_token,secret)
     return app
 
 
