@@ -61,6 +61,8 @@ class Repository:
         if row:
             if row["request_hash"]!=h:
                 raise Conflict("idempotency key reused with different body")
+            if (operation in ("create_scenario","enqueue") or operation.startswith(("create_revision:","cancel:"))) and "response" not in row["response_body"]:
+                raise Conflict("legacy idempotency record; retrieve the original resource before issuing a new request")
             return row["response_body"]
         result=fn()
         c.execute("INSERT INTO idempotency_keys(workspace_id,actor_id,operation,key,request_hash,response_status,response_body,expires_at) VALUES (%s,%s,%s,%s,%s,%s,%s,clock_timestamp()+interval '24 hours')",(*args,h,status,Jsonb(result)))
