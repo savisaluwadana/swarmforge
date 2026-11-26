@@ -17,3 +17,6 @@ CI is configured to compile, execute unit/randomized invariant tests, run the ac
 
 ### Next gate
 Inspect CI and fix any failures before implementing scoped authority, local auction and reconciliation. Add event payload and OpenAPI schema validation, test stale grants and safe unpicked release, then benchmark matched scenarios. Do not start UI before core correctness gates pass.
+
+### CI iteration 1
+[First workflow](https://github.com/savisaluwadana/swarmforge/actions/runs/45774186850): compilation passed; 11 tests executed, 7 errored because the event emitter's `kind` parameter collided with the network message payload key. Renamed the emitter parameter without altering the event contract. Tightened the outage assertion to verify no task pickup or message delivery during isolation, rather than treating the controller's local tentative reservation as a delivered grant. Rerun required.

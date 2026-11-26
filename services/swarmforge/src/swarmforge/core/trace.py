@@ -41,6 +41,6 @@ class Trace:
         self.events = []
         self.tick = 0
 
-    def emit(self, kind, **payload):
+    def emit(self, event_type, **payload):
         self.events.append({"schema_version":1,"run_id":self.run_id,"seq":len(self.events)+1,
-                            "tick":self.tick,"type":kind,"payload":deepcopy(payload)})
+                            "tick":self.tick,"type":event_type,"payload":deepcopy(payload)})

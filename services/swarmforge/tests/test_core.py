@@ -29,15 +29,18 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(a["metrics"]["completed"],2)
         self.assertEqual(a["metrics"]["actual_collisions"],0)
 
-    def test_outage_blocks_late_assignment(self):
+    def test_outage_blocks_late_pickup(self):
         a=simulate(fixture())
         healthy=fixture()
         healthy["faults"]=[]
         b=simulate(healthy)
-        def assigned(result):
-            return next(e["tick"] for e in result["events"] if e["type"]=="task.assigned" and e["payload"]["task_id"]=="t2")
-        self.assertGreaterEqual(assigned(a),20)
-        self.assertLess(assigned(b),20)
+        def picked(result):
+            return next(e["tick"] for e in result["events"] if e["type"]=="task.picked" and e["payload"]["task_id"]=="t2")
+        self.assertGreaterEqual(picked(a),20)
+        self.assertLess(picked(b),20)
+        # A controller may reserve using a heartbeat that has not yet timed out.
+        # No grant crosses the disconnected network; only a delivered grant permits execution.
+        self.assertFalse(any(e["type"]=="network.message_delivered" and "C" in (e["payload"]["sender"],e["payload"]["receiver"]) and 5<=e["tick"]<20 for e in a["events"]))
 
     def test_crash_while_carrying(self):
         c=fixture()

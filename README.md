@@ -26,3 +26,15 @@ Status: design proposal, no implementation or measured performance yet. Run resu
 
 `docker compose up --build` will start web, API, worker and PostgreSQL.
 `make test`, `make benchmark-smoke` and `make demo` are planned commands.
+
+## Milestone 1: local core (implementation branch)
+
+From the repository root with Python 3.12+ and Make:
+
+```bash
+make test
+make demo
+make replay
+```
+
+The CLI runs the actual centralized baseline using the two-robot scripted outage fixture, writes `artifacts/demo.json`, and checks the semantic digest on replay. No database or cloud service is needed. Other algorithms and web/API services are not implemented yet. See [progress](docs/progress.md) for the current verification status and limitations.
