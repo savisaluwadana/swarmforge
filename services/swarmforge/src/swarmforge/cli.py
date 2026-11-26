@@ -8,10 +8,11 @@ from swarmforge.domain.model import InvalidScenario
 
 
 def main():
-    parser=argparse.ArgumentParser(description="SwarmForge simulation-only milestone 1")
+    parser=argparse.ArgumentParser(description="SwarmForge simulation-only research core")
     sub=parser.add_subparsers(dest="cmd",required=True)
     run=sub.add_parser("run")
     run.add_argument("scenario",type=Path)
+    run.add_argument("--algorithm",choices=["centralized_greedy","scoped_lease"],default="centralized_greedy")
     run.add_argument("--seed",type=int,default=0)
     run.add_argument("--engine-version",default=__version__)
     run.add_argument("--output",type=Path,required=True)
@@ -22,7 +23,7 @@ def main():
     try:
         if args.cmd=="run":
             config=json.loads(args.scenario.read_text())
-            result=Simulation(build_manifest(config,args.seed,args.engine_version)).run()
+            result=Simulation(build_manifest(config,args.seed,args.engine_version,algorithm=args.algorithm)).run()
             args.output.parent.mkdir(parents=True,exist_ok=True)
             args.output.write_bytes(canonical(result)+b"\n")
             print(json.dumps(result["metrics"],indent=2))

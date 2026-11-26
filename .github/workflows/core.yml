@@ -22,7 +22,13 @@ jobs:
         run: make demo PYTHON=python
       - name: Verify deterministic replay
         run: make replay PYTHON=python
+      - name: Run scoped lease smoke experiment
+        run: make demo-scoped PYTHON=python
+      - name: Verify scoped replay
+        run: make replay-scoped PYTHON=python
       - uses: actions/upload-artifact@v4
         with:
-          name: centralized-smoke
-          path: artifacts/demo.json
+          name: coordination-smoke
+          path: |
+            artifacts/demo.json
+            artifacts/scoped.json
