@@ -9,7 +9,7 @@ This is a proposed sprint; actual competition portal availability, team eligibil
 | 3 (6–10h) | PostgreSQL migration, API, worker lease and events | Create scenario/run, persisted metrics, cancel, restart tests |
 | 4 (6–10h) | Lab UI, live timeline, comparison, export | End-to-end actual simulation from browser; no mock metrics |
 | 5 (4–8h) | Benchmark matrix, reproducible evidence, pitch | Raw manifests/results, limitations, recorded demo |
-Estimates uncertain. If time slips, defer live injection, AI assistant, map editor, multi-user admin, cloud deployment and visuals before compromising algorithm correctness. If the core hypothesis fails, still report measured results or pivot the research question; no made-up win.
+Estimates uncertain. If time slips, defer map editor polish, multi-user admin, cloud deployment and visuals before compromising algorithm correctness. The amended MVP makes bounded agent orchestration and MCP mandatory; any reduction requires explicit release-scope review or a labeled research preview. If the core hypothesis fails, still report measured results or pivot the research question; no made-up win.
 
 ## Tasks / parallel agent work
 A Core: domain types, virtual clock, event ordering, grid and network. B Algorithms: policy ports, baseline and experimental scheduler, no hidden oracle. C Persistence/API: migration, repo transactions, auth and generated contract, SSE. D Frontend: generated types, scenario form, canvas renderer, benchmark UI; start with clearly labeled fixture data then remove all demo mock pathways for real results. E Verification: property tests, reproducible manifests, comparison and CI. Integration owner reviews shared schema and state changes; no simultaneous edits to canonical contracts. 
@@ -24,3 +24,6 @@ Branch by module, small PRs, review before merge. Contract-first; run unit and i
 - README and demo explain simulation-only boundary; no physical command path.
 ## Go/no-go
 Within first six hours: confirm eligibility/portal and teammate; implement one map with two robots, one task, one controller outage; obtain deterministic trace and demonstrable authority behavior. If not, reduce scope to CLI experiment; no polished dashboard before core. 
+
+## Release execution plan amendment
+The eight-PR release train and acceptance matrix in [mvp-release.md](mvp-release.md) supersede the original rough stage estimates for release planning. [agent-platform.md](agent-platform.md) defines new P0 agentic requirements and [demo-guide.md](demo-guide.md) defines user-visible acceptance. Dates remain aspirational; no deadline guarantee. Keep a tested incremental branch and do not declare v1 complete until all release gates pass.

@@ -21,7 +21,7 @@ Initial buyer: robotics system integrator or warehouse automation engineering le
 
 ## Scope / requirements
 P0: workspace-scoped scenarios with immutable revisions, map validator, 10–100 simulated robots, deterministic event engine, three scheduler strategies, collision-aware movement, scripted faults, task audit, run lifecycle, resumable SSE, results, matched benchmark suite, CLI, reproducibility. Interactive fault injection is P0 if time permits after scripted scenarios; otherwise P1. 
-P1: read-only AI analyst, saved presets, experiment reports, replay timeline, map editor polish. P2: multi-site support, richer physical simulation, battery/charging, adapters, enterprise SSO, RBAC granularity. Production robot commands explicitly excluded.
+P0 release scope revision: bounded agent-assisted scenario and experiment planning, human-approved execution through gateway, authenticated MCP and evidence-backed report; manual path works without provider. P1: richer presets, reporting, replay polish and map editor polish. P2: multi-site support, richer physical simulation, battery/charging, adapters, enterprise SSO, RBAC granularity. Production robot commands explicitly excluded.
 Performance targets (not observed): 100 robots, map <= 100x100, <= 1000 tasks, <= 10000 logical ticks, <= 4 concurrent jobs globally in demo; interactive UI capped at 10 frames/sec; 95% API reads <500 ms on local test hardware excluding streaming and heavy exports. Enforce budgets and measure on actual hardware. Defaults: 20 robots, 24x18 map, 100 tasks, 1000 ticks, tick_ms=1000 simulated time. Fleet size minimum 1 for unit/smoke tests.
 
 ## Screens
@@ -38,3 +38,6 @@ Empty/loading/error/offline states on every screen. Use a restrained industrial 
 
 ## Business hypotheses
 Sell simulation/reliability testing to integrators before operational control. Validate with 5–10 robotics engineers, request failure incident examples, compare current test process, identify budget holder and willingness to pay. Potential model: per engineering seat or per benchmark quota, later annual enterprise license; no revenue assumptions treated as evidence. Competition demo: normal run → same workload and seed with partition → compare three policies → inspect fenced/deferred work → export manifest. Demonstrate tradeoffs even if experimental policy loses.
+
+## Agent-assisted use cases (proposed)
+UC11 engineer describes a fault goal in natural language -> typed plan preview, validation, exact run count, human approval, real run IDs. UC12 external MCP host discovers tools, drafts plan, directs user to trusted approval UI, executes approved plan and queries measured evidence; cross-workspace and unapproved execution rejected. UC13 investigator asks why a task stalled -> evidence references or explicit missing evidence. See mvp-release.md and agent-platform.md for acceptance criteria.

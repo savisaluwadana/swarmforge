@@ -1,0 +1,526 @@
+{
+  "status": "proposed; not MCP runtime discovery response; R6 must implement exact input and output JSON Schemas and tests",
+  "version": "1.0-proposal",
+  "transport": "Streamable HTTP /mcp",
+  "tools": [
+    {
+      "name": "list_scenarios",
+      "description": "List authorized scenario revisions and summaries",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Scenario summaries, cursor; no other workspace data"
+    },
+    {
+      "name": "get_scenario",
+      "description": "Read immutable scenario revision",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "workspace_id",
+          "scenario_id",
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical Revision including config hash"
+    },
+    {
+      "name": "validate_scenario",
+      "description": "Validate candidate scenario without saving",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scenario_config": {
+            "type": "object",
+            "description": "Canonical ScenarioConfig; enforce schema and semantic validator"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "scenario_config"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical Validation, field issues"
+    },
+    {
+      "name": "create_experiment_plan",
+      "description": "Draft bounded immutable experiment plan; does not enqueue",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scenario_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "scenario_config": {
+                  "type": "object",
+                  "description": "Canonical ScenarioConfig from contracts/openapi.json; resolve and validate at R6"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "label"
+              ],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "scenario_id",
+                    "revision"
+                  ],
+                  "not": {
+                    "required": [
+                      "scenario_config"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "scenario_config"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "scenario_id"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "revision"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 4
+          },
+          "algorithms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "centralized_greedy",
+                "local_auction",
+                "scoped_lease"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "seeds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "minItems": 1,
+            "maxItems": 12,
+            "uniqueItems": true
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspace_id",
+          "objective",
+          "cases",
+          "algorithms",
+          "seeds",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "draft",
+      "x-output-contract": "plan_id, plan_hash, run_count<=12, engine_version, expires_at, status, trusted approval_url; validated canonical config/revisions"
+    },
+    {
+      "name": "get_experiment_plan",
+      "description": "Read draft/approval/execution status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "plan_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "plan ID, hash, approval state, run IDs, expiration, exact immutable input"
+    },
+    {
+      "name": "execute_approved_plan",
+      "description": "Enqueue exact approved plan once; never approves",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_plan_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspace_id",
+          "plan_id",
+          "expected_plan_hash",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "approved_write",
+      "x-output-contract": "plan ID, persisted run/benchmark IDs, status; duplicate returns same IDs"
+    },
+    {
+      "name": "get_run_status",
+      "description": "Read simulation lifecycle and progress",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "run_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical Run"
+    },
+    {
+      "name": "get_run_metrics",
+      "description": "Read measured simulation metrics",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "run_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical Metrics or not-ready error"
+    },
+    {
+      "name": "get_run_events",
+      "description": "Read bounded event history",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "after_seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "workspace_id",
+          "run_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical EventPage; next cursor"
+    },
+    {
+      "name": "get_run_manifest",
+      "description": "Read immutable reproducibility manifest",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "run_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical Manifest and hash"
+    },
+    {
+      "name": "get_benchmark_status",
+      "description": "Read benchmark batch status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "benchmark_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "benchmark_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical Benchmark"
+    },
+    {
+      "name": "compare_benchmark",
+      "description": "Read measured paired comparison",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "benchmark_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "benchmark_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Canonical BenchmarkComparison, missing/failed counts"
+    },
+    {
+      "name": "get_evidence_report",
+      "description": "Retrieve deterministic evidence report with references",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "benchmark_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "benchmark_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "x-swarmforge-policy": "read",
+      "x-output-contract": "Structured measured facts, run/seq or metric/hash refs, caveats, optional clearly labeled narrative"
+    }
+  ]
+}
