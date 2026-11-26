@@ -38,3 +38,6 @@ At R0, only R1 partial foundations verified: 19 tests, 2 policies, both replay c
 
 ## Definition of done and demo
 See demo-guide.md. One real scenario from browser and one via MCP must enqueue through the same application service and durable worker, show actual events and results, verify manifest replay, expose failure tradeoffs and no unsupported claims. Product manual mode must be functional without LLM provider. Any hosted deployment is optional and separately authorized; local Compose is release gate. No physical integrations.
+
+## R7 status update
+R6 merged with all three workflows passing. See [release candidate](release-candidate.md) for evidence and open gates. R7 must not tag v1.0.0 while required gates remain open. Local research preview is the truthful fallback if release criteria cannot be fully met.

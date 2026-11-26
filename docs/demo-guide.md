@@ -23,3 +23,6 @@ Primary: warehouse robotics integration engineer / reliability lead. Problem: "W
 - Would this reduce time spent reproducing incidents or testing fleet software? Ask about existing process, frequency, budget holder and willingness to pay. No invented customer feedback.
 ## Assets for release PR
 README quick start, 1-page architecture diagram, 3-minute demo script and recording or explicit recording not produced, actual benchmark CSV/JSON with commit/manifest hashes, limitations and research methodology, screenshots from real running UI, MCP integration guide with tested client and auth config, slide-ready product positioning (problem/solution/demo/evidence/business/roadmap). No claim of physical safety, certified control, proven novelty or customer deployment.
+
+## R7 operational update
+The actual browser and official MCP client acceptance passed at R6; links in release-candidate.md. Built-in planner is optional and live provider remains unverified; use manual draft or local MCP for a reliable no-key demo. Evidence view shows real event references and measured facts, not a model-generated causal narrative. Competition narrative in competition-pitch.md. No recording produced. Do not present an unverified feature as live.

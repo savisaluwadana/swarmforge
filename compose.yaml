@@ -44,7 +44,12 @@ services:
       AGENT_LLM_WORKSPACE_DAY_USD: ${AGENT_LLM_WORKSPACE_DAY_USD:-0}
       AGENT_LLM_INPUT_USD_PER_MILLION: ${AGENT_LLM_INPUT_USD_PER_MILLION:-0}
       AGENT_LLM_OUTPUT_USD_PER_MILLION: ${AGENT_LLM_OUTPUT_USD_PER_MILLION:-0}
-    command: ["uvicorn","swarmforge.api.main:from_env","--factory","--host","0.0.0.0","--port","8000"]
+    command: ["uvicorn","swarmforge.api.main:from_env","--factory","--host","0.0.0.0","--port","8000","--no-proxy-headers"]
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -68,6 +73,6 @@ services:
       - "127.0.0.1:3000:3000"
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
 volumes:
   pgdata:

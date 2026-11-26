@@ -1,0 +1,121 @@
+name: Release candidate
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  dependency-locks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify committed dependency locks
+        run: |
+          python -m venv /tmp/swarmforge-lock
+          /tmp/swarmforge-lock/bin/pip install -r services/swarmforge/requirements.lock
+          /tmp/swarmforge-lock/bin/pip check
+          /tmp/swarmforge-lock/bin/pip freeze > /tmp/actual.lock
+          diff -u services/swarmforge/requirements.lock /tmp/actual.lock
+          cd apps/web
+          npm ci --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dependency-locks
+          path: |
+            services/swarmforge/requirements.lock
+            apps/web/package-lock.json
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: services/swarmforge/src
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate local configuration
+        run: python scripts/init_local.py
+      - name: Build and start actual Compose stack
+        run: |
+          docker compose up --build -d
+          docker compose exec -T api python -m swarmforge.api.seed
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null && curl -fsS http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Install acceptance clients
+        run: |
+          python -m pip install -r services/swarmforge/requirements.lock
+          cd apps/web
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Actual Compose security, MCP and browser acceptance
+        run: |
+          set -a; . ./.env; set +a
+          python scripts/compose_acceptance.py
+          python services/swarmforge/tests/mcp_client_smoke.py
+          cd apps/web
+          npm run test:e2e
+      - name: Restart and verify persisted evidence
+        run: |
+          docker compose restart postgres
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U swarmforge -d swarmforge >/dev/null; then break; fi
+            sleep 1
+          done
+          docker compose restart api worker
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          set -a; . ./.env; set +a
+          python scripts/verify_restart.py
+      - name: Save service diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts/compose
+          docker compose ps -a > artifacts/compose/services.txt
+          docker compose logs --no-color > artifacts/compose/service.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compose-acceptance
+          path: |
+            artifacts/compose/
+            apps/web/test-results/*.png
+      - name: Remove ephemeral stack
+        if: always()
+        run: docker compose down -v --remove-orphans
+  scale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: services/swarmforge/src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r services/swarmforge/requirements.lock
+      - name: Characterize independent scale boundaries
+        run: python scripts/scale_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scale-smoke
+          path: artifacts/scale/
