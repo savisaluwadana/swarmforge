@@ -38,3 +38,13 @@ make replay
 ```
 
 The CLI runs the actual centralized baseline using the two-robot scripted outage fixture, writes `artifacts/demo.json`, and checks the semantic digest on replay. No database or cloud service is needed. Other algorithms and web/API services are not implemented yet. See [progress](docs/progress.md) for the current verification status and limitations.
+
+## Experimental scoped-lease increment (v0.2)
+
+```bash
+make test
+make demo-scoped
+make replay-scoped
+```
+
+Runs the same two-robot fixture with fixed, predelegated scope authority and local leader auction rounds. Compare task events during the outage; do not interpret the tiny fixture as a comparative research benchmark. See docs/coordination.md for assumptions and pending renewal/reconciliation work.

@@ -10,3 +10,10 @@ demo:
 
 replay:
 	$(PYTHON) -m swarmforge.cli replay artifacts/demo.json
+
+.PHONY: demo-scoped replay-scoped
+demo-scoped:
+	$(PYTHON) -m swarmforge.cli run examples/two-robot-outage.json --algorithm scoped_lease --seed 42 --output artifacts/scoped.json
+
+replay-scoped:
+	$(PYTHON) -m swarmforge.cli replay artifacts/scoped.json

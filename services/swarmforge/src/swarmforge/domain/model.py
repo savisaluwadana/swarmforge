@@ -100,6 +100,9 @@ class Task:
     epoch: int = 0
     expires_tick: int | None = None
     completed_tick: int | None = None
+    issuer: str = "C"
+    scope_epoch: int | None = None
+    deferred: bool = False
 
 
 @dataclass
@@ -115,6 +118,8 @@ class Robot:
     pickup: Point | None = None
     dropoff: Point | None = None
     waiting_ticks: int = 0
+    issuer: str = "C"
+    scope_id: str | None = None
 
 
 def validate_config(config: dict) -> Grid:

@@ -6,11 +6,14 @@ from swarmforge import __version__
 from swarmforge.domain.model import Robot,Task,TaskSpec,validate_config,xy,integer
 from swarmforge.core.trace import Trace,digest,semantic_digest
 from swarmforge.motion.grid import plan,resolve
-from swarmforge.network.emulator import Network
+from swarmforge.network.emulator import Network, Message
+from swarmforge.policies.scoped import ScopeLedger, ZoneAuction
 from swarmforge.policies.centralized import CentralizedGreedy
 
 
-def build_manifest(config, seed, engine_version=__version__, scenario_id=None, revision=1):
+def build_manifest(config, seed, engine_version=__version__, scenario_id=None, revision=1, algorithm="centralized_greedy"):
+    if algorithm not in ("centralized_greedy","scoped_lease"):
+        raise NotImplementedError("unsupported algorithm: "+str(algorithm))
     validate_config(config)
     integer(seed,0,2147483647,"/seed")
     integer(revision,1,2147483647,"/revision")
@@ -20,17 +23,17 @@ def build_manifest(config, seed, engine_version=__version__, scenario_id=None, r
     return {"schema_version":1,"engine_version":engine_version,
             "dependency_lock_hash":sha256(b"swarmforge-core-runtime:stdlib-only:v1").hexdigest(),
             "scenario_id":sid,"revision":revision,"config_hash":ch,"config":config,
-            "algorithm":"centralized_greedy","policy_parameters":{"heartbeat_timeout_ticks":3,"path_horizon":32,"grant_expiry":"run_end"},
+            "algorithm":algorithm,"policy_parameters":{"heartbeat_timeout_ticks":3,"path_horizon":32,"grant_expiry":"run_end" if algorithm=="centralized_greedy" else "scope_expiry","auction_ticks":3 if algorithm=="scoped_lease" else 0},
             "seed":seed,"mode":"scripted"}
 
 
 class Simulation:
     def __init__(self, manifest, run_id=None):
         self.manifest = deepcopy(manifest)
-        if manifest["algorithm"] != "centralized_greedy" or manifest["mode"] != "scripted":
-            raise NotImplementedError("milestone 1 supports scripted centralized_greedy only")
+        if manifest["algorithm"] not in ("centralized_greedy","scoped_lease") or manifest["mode"] != "scripted":
+            raise NotImplementedError("only scripted centralized_greedy and scoped_lease supported")
         config = self.manifest["config"]
-        expected = build_manifest(config,manifest["seed"],manifest["engine_version"],manifest["scenario_id"],manifest["revision"])
+        expected = build_manifest(config,manifest["seed"],manifest["engine_version"],manifest["scenario_id"],manifest["revision"],manifest["algorithm"])
         if self.manifest != expected:
             raise ValueError("manifest does not match supported configuration and policy")
         self.grid = validate_config(config)
@@ -41,6 +44,10 @@ class Simulation:
         self.tasks = {t["id"]:Task(TaskSpec(t["id"],(t["pickup"]["x"],t["pickup"]["y"]),(t["dropoff"]["x"],t["dropoff"]["y"]),t["release_tick"],t["priority"],t.get("due_tick"))) for t in config["tasks"]}
         self.network = Network(config["network"],set(self.robots)|{"C"},manifest["seed"],self.trace)
         self.policy = CentralizedGreedy()
+        self.scopes = ScopeLedger(config,self.grid) if manifest["algorithm"]=="scoped_lease" else None
+        self.auctions = {z:ZoneAuction(s,self.scopes.grids[z]) for z,s in self.scopes.grants.items()} if self.scopes else {}
+        self.expired_scopes = set()
+        self.completion_issuers = {}
         self.grant_payloads = {}
         self.acked = set()
         self.conflicts = self.stale = 0
@@ -77,54 +84,88 @@ class Simulation:
                 self.network.active[fid]=f
             self.network.invalidate_blocked()
 
-    def grant(self,tick,proposal):
+    def send(self,tick,sender,receiver,kind,body):
+        # A same-process leader/robot delivery is local, not a network message.
+        if sender == receiver:
+            msg=Message("local",sender,receiver,kind,deepcopy(body),tick,tick)
+            if kind=="grant":
+                self.robot_receive(tick,self.robots[receiver],[msg])
+            elif kind=="completed":
+                self.auctions[self.robots[receiver].zone].receive(tick,[msg])
+                self.acked.add(body["task_id"])
+            elif kind=="ack":
+                self.acked.add(body["task_id"])
+        else:
+            self.network.send(tick,sender,receiver,kind,body)
+
+    def grant(self,tick,proposal,issuer="C",auction=None):
         # Gate validates only; it does not choose tasks/robots or return remote status.
         task=self.tasks[proposal.task_id]
         if not task.released or task.status != "pending":
             self.reject(self.robots[proposal.robot_id],proposal.task_id,task.epoch,"task_not_pending")
             return
+        scope_epoch=auction.token["epoch"] if auction else None
+        expires=auction.token["expires_tick"] if auction else self.duration
+        if self.scopes and not self.scopes.permits(tick,task.spec.id,issuer,proposal.robot_id,scope_epoch):
+            self.reject(self.robots[proposal.robot_id],proposal.task_id,task.epoch,"scope_violation")
+            return
         task.status="assigned"
         task.holder=proposal.robot_id
         task.epoch+=1
-        task.expires_tick=self.duration
-        self.policy.reserve(proposal)
-        body={"task_id":task.spec.id,"epoch":task.epoch,"expires_tick":self.duration,
-              "pickup":task.spec.pickup,"dropoff":task.spec.dropoff}
-        self.grant_payloads[task.spec.id]=(proposal.robot_id,body)
-        self.trace.emit("authority.granted",task_id=task.spec.id,holder=proposal.robot_id,epoch=task.epoch,expires_tick=self.duration,issuer_id="C")
-        self.trace.emit("task.assigned",task_id=task.spec.id,robot_id=proposal.robot_id,epoch=task.epoch,expires_tick=self.duration,issuer_id="C")
-        self.network.send(tick,"C",proposal.robot_id,"grant",body)
+        task.expires_tick=expires
+        task.issuer=issuer
+        task.scope_epoch=scope_epoch
+        if auction:
+            auction.reservations[proposal.task_id]=proposal.robot_id
+        else:
+            self.policy.reserve(proposal)
+        body={"task_id":task.spec.id,"epoch":task.epoch,"expires_tick":expires,
+              "pickup":task.spec.pickup,"dropoff":task.spec.dropoff,
+              "scope_id":auction.scope.zone if auction else None}
+        self.grant_payloads[task.spec.id]=(proposal.robot_id,body,issuer)
+        self.trace.emit("authority.granted",task_id=task.spec.id,holder=proposal.robot_id,epoch=task.epoch,expires_tick=expires,issuer_id=issuer)
+        self.trace.emit("task.assigned",task_id=task.spec.id,robot_id=proposal.robot_id,epoch=task.epoch,expires_tick=expires,issuer_id=issuer)
+        self.send(tick,issuer,proposal.robot_id,"grant",body)
 
     def robot_receive(self,tick,r,inbox):
         for msg in inbox:
-            if msg.kind != "grant" or msg.sender != "C":
+            if msg.kind != "grant":
                 continue
             b=msg.body
+            if msg.sender != "C" and (not self.scopes or b.get("scope_id") != r.zone or self.scopes.grants[r.zone].leader != msg.sender):
+                self.reject(r,b["task_id"],b["epoch"],"unauthorized_issuer")
+                continue
             if tick >= b["expires_tick"]:
                 self.reject(r,b["task_id"],b["epoch"],"expired")
                 continue
             if r.task_id==b["task_id"] and r.epoch==b["epoch"]:
-                self.network.send(tick,r.id,"C","ack",{"task_id":r.task_id,"epoch":r.epoch})
+                self.send(tick,r.id,msg.sender,"ack",{"task_id":r.task_id,"epoch":r.epoch})
                 continue
             if r.mode!="idle":
                 self.reject(r,b["task_id"],b["epoch"],"robot_busy")
                 continue
             # A completed task can have a delayed duplicate grant. Local tombstones reject it.
             if (r.id,b["task_id"],b["epoch"]) in self.local_completed:
-                self.network.send(tick,r.id,"C","completed",{"task_id":b["task_id"],"epoch":b["epoch"]})
+                self.send(tick,r.id,msg.sender,"completed",{"task_id":b["task_id"],"epoch":b["epoch"]})
                 continue
             r.task_id=b["task_id"]
             r.epoch=b["epoch"]
             r.expires_tick=b["expires_tick"]
+            r.issuer=msg.sender
+            r.scope_id=b.get("scope_id")
             r.pickup=tuple(b["pickup"])
             r.dropoff=tuple(b["dropoff"])
             r.mode="moving_to_pickup"
-            self.network.send(tick,r.id,"C","ack",{"task_id":r.task_id,"epoch":r.epoch})
+            self.send(tick,r.id,msg.sender,"ack",{"task_id":r.task_id,"epoch":r.epoch})
 
     def authorized(self,tick,r):
         t=self.tasks[r.task_id]
         valid=(t.holder==r.id and t.epoch==r.epoch and t.expires_tick is not None and
                tick<t.expires_tick and t.status==("picked" if r.carrying else "assigned"))
+        if valid and self.scopes:
+            valid=self.scopes.permits(tick,t.spec.id,r.issuer,r.id,t.scope_epoch)
+            if valid and r.scope_id is not None:
+                valid=self.scopes.grids[r.scope_id].free(r.position)
         if not valid:
             self.reject(r,r.task_id,r.epoch,"invalid_authority")
         return valid
@@ -138,7 +179,8 @@ class Simulation:
             valid.append(rid)
             goal=r.dropoff if r.carrying else r.pickup
             if r.position!=goal:
-                path=plan(self.grid,r.position,goal)
+                local_grid=self.scopes.grids[r.scope_id] if r.scope_id is not None else self.grid
+                path=plan(local_grid,r.position,goal)
                 if path:
                     proposals[rid]=path[0]
         moves,rejected=resolve(self.grid,{rid:r.position for rid,r in self.robots.items()},proposals)
@@ -165,7 +207,8 @@ class Simulation:
                 t.completed_tick=tick
                 self.trace.emit("task.completed",task_id=t.spec.id,robot_id=rid,epoch=r.epoch)
                 self.local_completed.add((rid,t.spec.id,r.epoch))
-                self.network.send(tick,rid,"C","completed",{"task_id":t.spec.id,"epoch":r.epoch})
+                self.completion_issuers[(rid,t.spec.id,r.epoch)]=r.issuer
+                self.send(tick,rid,r.issuer,"completed",{"task_id":t.spec.id,"epoch":r.epoch})
                 r.mode="idle"
                 r.task_id=None
                 r.carrying=False
@@ -177,6 +220,57 @@ class Simulation:
         if len({r.position for r in self.robots.values()}) != len(self.robots):
             raise RuntimeError("I4: vertex collision")
 
+    def expire_scopes(self,tick):
+        if not self.scopes:
+            return
+        for zone,s in sorted(self.scopes.grants.items()):
+            if tick < s.expires_tick or zone in self.expired_scopes:
+                continue
+            self.expired_scopes.add(zone)
+            self.trace.emit("authority.expired",scope_id=zone,holder=s.leader,epoch=s.epoch)
+            for t in sorted(self.tasks.values(),key=lambda t:t.spec.id):
+                if self.scopes.task_zone.get(t.spec.id)!=zone or t.status in ("completed","stranded"):
+                    continue
+                if t.status=="picked":
+                    t.status="stranded"
+                    self.trace.emit("task.stranded",task_id=t.spec.id,robot_id=t.holder,reason="scope_expired_carrying")
+                if t.holder is not None:
+                    self.trace.emit("authority.expired",task_id=t.spec.id,holder=t.holder,epoch=t.epoch)
+                if t.released:
+                    t.deferred=True
+                    self.trace.emit("task.deferred",task_id=t.spec.id,reason="scope_expired_uncertain")
+                # A robot with an expired local grant cannot move or act. Do not reuse it
+                # without reconciled state in this milestone.
+
+    def scoped_tick(self,tick,inbox):
+        if not self.scopes:
+            return
+        for zone,s in sorted(self.scopes.grants.items()):
+            if tick == 0:
+                self.trace.emit("authority.granted",scope_id=zone,holder=s.leader,epoch=s.epoch,expires_tick=s.expires_tick,issuer_id="C")
+            if tick%3 == 0 and tick < s.expires_tick:
+                self.network.send(tick,"C",s.leader,"scope",{"scope_id":zone,"epoch":s.epoch,"expires_tick":s.expires_tick})
+            leader=self.robots[s.leader]
+            if leader.mode=="failed":
+                continue
+            auction=self.auctions[zone]
+            auction.receive(tick,inbox.get(s.leader,[]))
+            for p in auction.decide(tick,leader,self.network):
+                self.grant(tick,p,s.leader,auction)
+        # Each robot responds using its own current state and received announcement only.
+        for rid,r in sorted(self.robots.items()):
+            if r.mode=="failed":
+                continue
+            auction=self.auctions[r.zone]
+            for m in inbox.get(rid,[]):
+                b=m.body
+                if m.kind!="auction" or m.sender!=auction.scope.leader or b["scope_id"]!=r.zone or tick>b["round"]+3:
+                    continue
+                spec=TaskSpec(b["task_id"],tuple(b["pickup"]),tuple(b["dropoff"]),tick,b["priority"],b["due_tick"])
+                score=auction.score(tick,r,spec)
+                if score is not None:
+                    self.network.send(tick,rid,m.sender,"bid",{"task_id":b["task_id"],"round":b["round"],"score":score})
+
     def run(self):
         if self.started:
             raise RuntimeError("simulation already executed")
@@ -187,22 +281,33 @@ class Simulation:
         for tick in range(self.duration):
             self.trace.tick=tick
             self.apply_faults(tick)
+            self.expire_scopes(tick)
             inbox=self.network.deliver(tick)
             for t in sorted(self.tasks.values(),key=lambda t:t.spec.id):
                 if t.spec.release_tick==tick:
                     t.released=True
-                    self.policy.release(t.spec)
+                    zone=self.scopes.task_zone.get(t.spec.id) if self.scopes else None
+                    if zone is None:
+                        self.policy.release(t.spec)
+                    elif zone in self.expired_scopes:
+                        t.deferred=True
+                    else:
+                        self.auctions[zone].release(t.spec)
                     self.trace.emit("task.released",task_id=t.spec.id)
+                    if t.deferred:
+                        self.trace.emit("task.deferred",task_id=t.spec.id,reason="scope_expired")
             self.policy.receive(tick,inbox.get("C",[]))
-            for m in inbox.get("C",[]):
-                grant=self.grant_payloads.get(m.body.get("task_id"))
-                if m.kind in ("ack","completed") and grant and grant[0]==m.sender and grant[1]["epoch"]==m.body.get("epoch"):
-                    self.acked.add(m.body["task_id"])
+            for receiver,messages in sorted(inbox.items()):
+                for m in messages:
+                    grant=self.grant_payloads.get(m.body.get("task_id"))
+                    if m.kind in ("ack","completed") and grant and grant[0]==m.sender and grant[2]==receiver and grant[1]["epoch"]==m.body.get("epoch"):
+                        self.acked.add(m.body["task_id"])
             for p in self.policy.choose(tick):
                 self.grant(tick,p)
-            for tid,(rid,body) in sorted(self.grant_payloads.items()):
-                if tid not in self.acked and tick%3==0 and tick>0:
-                    self.network.send(tick,"C",rid,"grant",body)
+            self.scoped_tick(tick,inbox)
+            for tid,(rid,body,issuer) in sorted(self.grant_payloads.items()):
+                if tid not in self.acked and tick%3==0 and tick>0 and tick<body["expires_tick"] and (issuer=="C" or self.robots[issuer].mode!="failed"):
+                    self.send(tick,issuer,rid,"grant",body)
             for rid,r in sorted(self.robots.items()):
                 if r.mode=="failed":
                     continue
@@ -211,11 +316,12 @@ class Simulation:
                 # Repeat completion evidence; controller deduplicates. Conservative milestone.
                 for robot_id,tid,epoch in sorted(self.local_completed):
                     if robot_id==rid and tick%3==0:
-                        self.network.send(tick,rid,"C","completed",{"task_id":tid,"epoch":epoch})
+                        self.send(tick,rid,self.completion_issuers[(rid,tid,epoch)],"completed",{"task_id":tid,"epoch":epoch})
             self.move_and_act(tick)
             if tick%10==0:
                 self.trace.emit("run.progress",completed=sum(t.status=="completed" for t in self.tasks.values()),released=sum(t.released for t in self.tasks.values()),duration_ticks=self.duration)
         self.trace.tick=self.duration
+        self.expire_scopes(self.duration)
         self.trace.emit("run.finished",status="succeeded",trace_hash="")
         h=semantic_digest(self.trace.events)
         self.trace.events[-1]["payload"]["trace_hash"]=h
@@ -225,8 +331,8 @@ class Simulation:
     def snapshot(self):
         return {"run_id":self.run_id,"seq":len(self.trace.events),"tick":self.trace.tick,
                 "robots":[{"id":r.id,"position":xy(r.position),"mode":r.mode,"task_id":r.task_id,"zone":r.zone} for r in sorted(self.robots.values(),key=lambda r:r.id)],
-                "tasks":[{"id":t.spec.id,"status":t.status,"holder":t.holder,"epoch":t.epoch,"expires_tick":t.expires_tick,"released":t.released,"deferred":False} for t in sorted(self.tasks.values(),key=lambda t:t.spec.id)],
-                "network":{"active_faults":sorted(self.network.active),"failed_nodes":sorted(self.network.dead)},"metrics":{},"authority":[]}
+                "tasks":[{"id":t.spec.id,"status":t.status,"holder":t.holder,"epoch":t.epoch,"expires_tick":t.expires_tick,"released":t.released,"deferred":t.deferred} for t in sorted(self.tasks.values(),key=lambda t:t.spec.id)],
+                "network":{"active_faults":sorted(self.network.active),"failed_nodes":sorted(self.network.dead)},"metrics":{},"authority":[{"scope_id":z,"holder":s.leader,"epoch":s.epoch,"expires_tick":s.expires_tick} for z,s in sorted(self.scopes.grants.items()) if z not in self.expired_scopes] if self.scopes and self.started and len(self.trace.events)>1 else []}
 
     def metrics(self,h):
         released=sum(t.released for t in self.tasks.values())
@@ -243,8 +349,8 @@ class Simulation:
                 "accepted_duplicates":0,"actual_collisions":0,"stale_rejections":self.stale,"messages_sent":self.network.sent,
                 "messages_delivered":self.network.delivered,"messages_dropped":self.network.dropped,"messages_in_flight":len(self.network.queue),
                 "messages_per_completion":self.network.sent/n if n else None,"trace_hash":h,
-                "breakdown":{"unfinished":released-n,"model":"conservative_grid_crash_stop","limitations":["no safe reassignment yet","centralized baseline only"]}}
+                "breakdown":{"unfinished":released-n,"model":"conservative_grid_crash_stop","limitations":["no safe reassignment or scope renewal yet","scope auction uses predeclared local workload sources"] if self.scopes else ["no safe reassignment yet","centralized baseline"]}}
 
 
-def simulate(config,seed=0,engine_version=__version__):
-    return Simulation(build_manifest(config,seed,engine_version)).run()
+def simulate(config,seed=0,engine_version=__version__,algorithm="centralized_greedy"):
+    return Simulation(build_manifest(config,seed,engine_version,algorithm=algorithm)).run()
